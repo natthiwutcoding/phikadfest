@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 ตั้งค่าธีมใน CSS ไม่มี tailwind.config.js แล้ว
+ * ตัวแปรใน @theme จะกลายเป็น utility class อัตโนมัติ
+ * เช่น --color-brand-500 ใช้เป็น bg-brand-500 / text-brand-500 ได้เลย
+ */
+@theme {
+  --font-sans: var(--font-noto-thai), ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* ส้มอบอุ่น — สื่อถึงโคมไฟและแสงไฟกลางคืนของงานเทศกาลไทย บนพื้นเข้มจะดูเหมือน "แสงเรือง" */
+  --color-brand-50: #fff8f1;
+  --color-brand-100: #ffecdb;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+}
+
+/*
+ * ธีมเดียว: Dark
+ *
+ * ตั้งใจไม่สลับตาม prefers-color-scheme เพราะ:
+ *  1. เว็บงานเทศกาลกลางคืน (โคมไฟ, ไฟประดับ) เข้ากับพื้นเข้มโดยธรรมชาติ
+ *  2. ดูแลจานสีเดียวง่ายกว่าสำหรับคนทำคนเดียว — ถ้าอยากเพิ่ม light mode
+ *     ทีหลังค่อยทำเป็นสวิตช์ในหน้า settings แทนการอิงระบบปฏิบัติการ
+ */
+:root {
+  --background: #120d0a;
+  --foreground: #f5f1ec;
+  --surface: #1c1512;
+  --surface-muted: #241a15;
+  --surface-raised: #2a1f19;
+  --line: #3a2c24;
+  --muted: #b3a397;
+}
+
+/* map ตัวแปรข้างบนเข้าเป็น utility: bg-background, text-muted, border-line ฯลฯ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-raised: var(--surface-raised);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ภาษาไทยไม่มีช่องว่างระหว่างคำ เบราว์เซอร์จึงตัดบรรทัดกลางคำได้
+   ค่านี้บอกให้ตัดตามขอบเขตคำจริงเมื่อเบราว์เซอร์รองรับ */
+:lang(th) {
+  word-break: auto-phrase;
+  line-break: normal;
+}
+
+/* พื้นที่แผนที่ — touch-action: none กันเบราว์เซอร์แย่งการสัมผัสไปเลื่อนหน้าจอ
+   ไม่งั้นลากแผนที่บนมือถือไม่ได้ เพราะนิ้วจะไปเลื่อนหน้าเว็บแทน */
+.map-canvas {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* transform-box/origin ต้องระบุเอง เพราะค่าตั้งต้นของ SVG อ้างอิงจาก viewport ไม่ใช่ตัว element
+   ตั้งที่ <g> ทุกตัวเลย เพราะระหว่างลากจะไม่มีคลาสอนิเมชั่นติดอยู่ */
+.map-canvas > g {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+/* ซูมแบบนุ่ม — ใช้ตอนกดจังหวัด กดปุ่มซูม หรือเด้งไปตำแหน่งผู้ใช้
+   ease-out ยาวๆ ทำให้ออกตัวเร็วแล้วค่อยๆ ผ่อนลงจนนิ่ง ดูเป็นธรรมชาติกว่าความเร็วคงที่ */
+.map-zoom {
+  transition: transform 1100ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ซูมแบบไว — ใช้กับล้อเมาส์ ต้องสั้นพอที่หมุนรัวๆ แล้วไม่รู้สึกหน่วงตามไม่ทัน
+   แต่ยังมี transition อยู่เพื่อกลบความกระตุกระหว่างแต่ละคลิกของล้อ */
+.map-zoom-quick {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ผู้ใช้ที่ตั้งค่าลดการเคลื่อนไหวไว้ (มักเพราะเวียนหัวกับอนิเมชั่น) ให้ตัดการเคลื่อนไหวออก
+   แต่ยังซูมไปตำแหน่งที่ถูกต้อง — ได้ผลลัพธ์เดิมโดยไม่ต้องดูภาพเคลื่อนไหว */
+@media (prefers-reduced-motion: reduce) {
+  .map-zoom,
+  .map-zoom-quick {
+    transition: none;
+  }
+}
+
+/* ชื่อจังหวัดบนแผนที่ — เส้นขอบสีพื้นหลังรอบตัวอักษรทำให้อ่านออกทั้งบนจังหวัดสีเข้มและสีจาง
+   paint-order บอกให้วาดเส้นขอบก่อนแล้วค่อยทับด้วยตัวอักษร ไม่งั้นขอบจะกินเนื้อตัวอักษร */
+.map-label {
+  fill: var(--foreground);
+  stroke: var(--background);
+  stroke-width: 3px;
+  paint-order: stroke fill;
+  font-weight: 500;
+  vector-effect: non-scaling-stroke;
+  user-select: none;
+}
+
+/* แสงเรืองรอบปุ่ม/องค์ประกอบสำคัญ — ให้ความรู้สึกโคมไฟ/ไฟประดับตามธีมงานเทศกาลกลางคืน */
+.glow-brand {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-500) 40%, transparent),
+    0 8px 24px -8px color-mix(in srgb, var(--color-brand-500) 55%, transparent);
+}
