@@ -231,20 +231,31 @@ create or replace function events_nearby(
   p_limit      integer default 50,
   p_category   smallint default null
 )
+-- คืนคอลัมน์เดียวกับที่ query ปกติคืน บวก distance_m
+-- เพื่อให้ฝั่งแอปแปลงผลลัพธ์ด้วยฟังก์ชัน map ตัวเดียวกันได้ ไม่ต้องเขียนแยกสองทาง
 returns table (
-  id            uuid,
-  slug          text,
-  title         text,
-  start_at      timestamptz,
-  end_at        timestamptz,
-  is_all_day    boolean,
-  venue_name    text,
-  district      text,
-  province_name text,
-  category_slug text,
+  id              uuid,
+  slug            text,
+  title           text,
+  description     text,
+  category_id     smallint,
+  province_id     smallint,
+  district        text,
+  venue_name      text,
+  address         text,
+  lat             double precision,
+  lng             double precision,
+  start_at        timestamptz,
+  end_at          timestamptz,
+  is_all_day      boolean,
   cover_image_url text,
-  is_free       boolean,
-  distance_m    double precision
+  ticket_url      text,
+  is_free         boolean,
+  price_min       integer,
+  price_max       integer,
+  organizer_name  text,
+  source_url      text,
+  distance_m      double precision
 )
 language sql
 stable
@@ -253,19 +264,26 @@ as $$
     e.id,
     e.slug,
     e.title,
+    e.description,
+    e.category_id,
+    e.province_id,
+    e.district,
+    e.venue_name,
+    e.address,
+    e.lat,
+    e.lng,
     e.start_at,
     e.end_at,
     e.is_all_day,
-    e.venue_name,
-    e.district,
-    p.name_th as province_name,
-    c.slug    as category_slug,
     e.cover_image_url,
+    e.ticket_url,
     e.is_free,
+    e.price_min,
+    e.price_max,
+    e.organizer_name,
+    e.source_url,
     st_distance(e.location, st_setsrid(st_makepoint(p_lng, p_lat), 4326)::geography) as distance_m
   from events e
-  join provinces  p on p.id = e.province_id
-  join categories c on c.id = e.category_id
   where e.status = 'approved'
     and e.end_at >= now()
     and e.location is not null
@@ -337,6 +355,13 @@ create policy "authenticated users submit events"
   on events for insert
   to authenticated
   with check (submitted_by = auth.uid() and status = 'pending');
+
+-- ⚠️ ตั้งใจไม่ให้ anon insert เข้าตารางนี้ได้โดยตรง
+--
+-- ฟอร์มแจ้งงานสาธารณะบันทึกผ่าน service role key ฝั่งเซิร์ฟเวอร์แทน
+-- (ดู src/lib/supabase/admin.ts) เพราะ anon key เป็นค่าสาธารณะที่อ่านได้จากเบราว์เซอร์
+-- ถ้าเปิดสิทธิ์ insert ให้ anon จะเท่ากับเปิดให้ยิงตรงเข้า REST API ได้โดยข้าม
+-- validation ฝั่งเซิร์ฟเวอร์ทั้งหมด — ยัดข้อความยาวไม่จำกัด ใส่ลิงก์อันตราย หรือสแปมได้
 
 create policy "users read own profile"
   on profiles for select

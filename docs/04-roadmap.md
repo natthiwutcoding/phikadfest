@@ -19,11 +19,13 @@
 
 ### งานที่ต้องทำ
 
-- [ ] สร้างโปรเจกต์ Supabase + รัน migration (ดู `03-data-model.md`)
-- [ ] เปลี่ยน `src/lib/events.ts` ให้ query จาก Supabase แทน sample data
-- [ ] ต่อฟอร์มแจ้งงานให้บันทึกจริง (`src/app/submit/actions.ts`)
-- [ ] Supabase Auth (email + Google) สำหรับแอดมิน
-- [ ] หน้าแอดมิน `/admin` — เพิ่ม/แก้ไข/อนุมัติ/ปฏิเสธงาน
+- [x] เปลี่ยน `src/lib/events.ts` ให้ query จาก Supabase แทน sample data
+      (fallback กลับไป sample data เองถ้าไม่มี env var)
+- [x] ต่อฟอร์มแจ้งงานให้บันทึกจริง — ส่งเข้าคิว `status = 'pending'` โดยไม่ต้องสมัครสมาชิก
+- [x] Supabase Auth (email + password) + หน้า `/login`
+- [x] หน้าแอดมิน `/admin` — อนุมัติ/ปฏิเสธงานที่ส่งเข้ามา ป้องกันสองชั้น (โค้ด + RLS)
+- [ ] สร้างโปรเจกต์ Supabase + รัน migration (ดู `03-data-model.md`) ← ต้องทำเองบน Dashboard
+- [ ] หน้าแอดมินสำหรับ **เพิ่ม/แก้ไข** งานเอง (ตอนนี้ทำได้แค่อนุมัติ/ปฏิเสธ)
 - [ ] อัปโหลดรูปปกงานเข้า Supabase Storage
 - [ ] OG image แบบ dynamic ต่องาน (`opengraph-image.tsx`)
 - [ ] PWA manifest + icon

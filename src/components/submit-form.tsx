@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 
-import { INITIAL_SUBMIT_STATE, submitEvent } from "@/app/(site)/submit/actions";
+import { submitEvent } from "@/app/(site)/submit/actions";
+import { INITIAL_SUBMIT_STATE } from "@/lib/form-state";
 import { CATEGORIES } from "@/lib/data/categories";
 import { PROVINCES_BY_REGION } from "@/lib/data/provinces";
 

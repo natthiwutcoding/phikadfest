@@ -3,14 +3,9 @@
 import { getCategory } from "@/lib/data/categories";
 import { getProvince } from "@/lib/data/provinces";
 import { USING_SAMPLE_DATA } from "@/lib/events";
-
-export interface SubmitState {
-  status: "idle" | "success" | "error";
-  message?: string;
-  errors?: Record<string, string>;
-}
-
-export const INITIAL_SUBMIT_STATE: SubmitState = { status: "idle" };
+import type { SubmitState } from "@/lib/form-state";
+import { createEventSlug } from "@/lib/slug";
+import { createSupabaseAdminClient, SERVICE_ROLE_CONFIGURED } from "@/lib/supabase/admin";
 
 function text(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -97,7 +92,61 @@ export async function submitEvent(
     };
   }
 
-  // TODO(Supabase): insert เข้าตาราง events ด้วย status 'pending'
-  // ดูโครงสร้างคอลัมน์ใน supabase/migrations/0001_init.sql
-  throw new Error("ยังไม่ได้เขียนโค้ดบันทึกลง Supabase");
+  if (!SERVICE_ROLE_CONFIGURED) {
+    console.error("[submit] ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY");
+    return {
+      status: "error",
+      message: "ระบบรับแจ้งงานยังไม่พร้อมใช้งาน กรุณาแจ้งทีมงาน",
+    };
+  }
+
+  // ผ่าน validation แล้ว — ทั้งสองค่านี้ยืนยันแล้วว่ามีอยู่จริง
+  const province = getProvince(provinceSlug)!;
+  const category = getCategory(categorySlug)!;
+
+  /*
+    ฟอร์มสาธารณะรับแค่วันที่ ไม่รับเวลา จึงบันทึกเป็นงานแบบ "ไม่ระบุเวลา" (is_all_day)
+    และตรึงเวลาเป็นเขตเวลาไทยชัดเจน ไม่ปล่อยให้ Postgres ตีความเป็น UTC
+    ซึ่งจะทำให้วันคลาดไปหนึ่งวันสำหรับผู้ใช้ในไทย
+  */
+  const startAt = `${startDate}T00:00:00+07:00`;
+  const endAt = `${endDate || startDate}T23:59:59+07:00`;
+
+  /*
+    ใช้ client ที่ข้าม RLS เพราะผู้แจ้งงานไม่ได้ล็อกอิน
+    ปลอดภัยเพราะโค้ดถึงจุดนี้ได้ก็ต่อเมื่อผ่าน validation ข้างบนครบแล้ว
+    และค่าที่ตัดสินสิทธิ์ (status, submitted_by) ถูกกำหนดตายตัวในโค้ด ไม่ได้มาจากผู้ใช้
+  */
+  const supabase = createSupabaseAdminClient();
+
+  const { error } = await supabase.from("events").insert({
+    slug: createEventSlug(title),
+    title,
+    description,
+    category_id: category.id,
+    province_id: province.id,
+    venue_name: venueName,
+    start_at: startAt,
+    end_at: endAt,
+    is_all_day: true,
+    organizer_contact: contact,
+    source_url: sourceUrl || null,
+    // สองค่านี้ต้องตรงกับที่ RLS policy กำหนดไว้ ไม่งั้นฐานข้อมูลจะปฏิเสธ
+    status: "pending",
+    submitted_by: null,
+  });
+
+  if (error) {
+    console.error("[submit] บันทึกงานไม่สำเร็จ:", error.message);
+    return {
+      status: "error",
+      message: "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หากยังไม่ได้กรุณาแจ้งทีมงาน",
+    };
+  }
+
+  return {
+    status: "success",
+    message:
+      "ส่งข้อมูลเรียบร้อยแล้ว ขอบคุณมากครับ — ทีมงานจะตรวจสอบก่อนเผยแพร่ ปกติใช้เวลาไม่เกิน 2 วัน",
+  };
 }
