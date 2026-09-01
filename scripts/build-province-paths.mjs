@@ -308,6 +308,19 @@ export const MAP_VIEWBOX = "0 0 ${MAP_WIDTH} ${mapHeight}";
 export const MAP_WIDTH = ${MAP_WIDTH};
 export const MAP_HEIGHT = ${mapHeight};
 
+/**
+ * ค่าคงที่ของ Web Mercator ที่ใช้ตอนแปลงขอบเขตจังหวัดเป็น SVG
+ *
+ * ต้อง export ออกมาเพราะการปักหมุดงานต้องแปลง lat/lng ตอนรัน (runtime)
+ * ด้วยสูตรและค่าคงที่ชุดเดียวกันเป๊ะ ไม่งั้นหมุดจะไม่ตรงกับรูปร่างจังหวัด
+ * ใช้คู่กับ projectToMap() ใน src/lib/map-camera.ts
+ */
+export const MAP_PROJECTION = {
+  minX: ${minX},
+  minY: ${minY},
+  scale: ${scale},
+} as const;
+
 /** รหัส ISO 3166-2 (เช่น 'TH-50') → SVG path — ตรงกับฟิลด์ code ใน provinces.ts */
 export const PROVINCE_PATHS: Record<string, string> = {
 ${sortedCodes.map((code) => `  "${code}": "${paths[code]}",`).join("\n")}

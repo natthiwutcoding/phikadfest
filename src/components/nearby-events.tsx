@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { EventCard } from "@/components/event-card";
+import { ACTIVE_REGION_LABEL } from "@/lib/region-scope";
 import type { EventWithRelations } from "@/lib/types";
 
 type State =
@@ -127,7 +128,7 @@ export function NearbyEvents() {
           </ul>
         ) : (
           <p className="mt-3 rounded-2xl border border-line bg-surface p-6 text-center text-sm text-muted">
-            ยังไม่มีงานในรัศมี 100 กม. จากคุณ ลองดูงานทั่วประเทศด้านล่างแทน
+            ยังไม่มีงานในรัศมี 100 กม. จากคุณ ลองดูงานทั้ง{ACTIVE_REGION_LABEL}ด้านล่างแทน
           </p>
         )
       ) : null}

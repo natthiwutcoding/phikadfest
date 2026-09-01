@@ -37,6 +37,11 @@
   --surface-raised: #2a1f19;
   --line: #3a2c24;
   --muted: #b3a397;
+
+  /* หมุดบอกตำแหน่งผู้ใช้บนแผนที่ — จงใจใช้สีฟ้าซึ่งอยู่คนละฝั่งวงล้อสีกับจานสีส้มของเว็บ
+     จึงแยกออกจากหมุดงานและวงจัดกลุ่มได้ทันทีโดยไม่ต้องมีคำอธิบาย
+     และตรงกับธรรมเนียมแอปแผนที่ที่ทุกคนคุ้นเคยอยู่แล้วว่าจุดฟ้า = ตัวเราอยู่ตรงนี้ */
+  --user-location: #38bdf8;
 }
 
 /* map ตัวแปรข้างบนเข้าเป็น utility: bg-background, text-muted, border-line ฯลฯ */
@@ -89,12 +94,39 @@ body {
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* วงจางที่เต้นรอบหมุดตำแหน่งผู้ใช้ — ดึงสายตาให้หาตัวเองเจอเร็วท่ามกลางหมุดงานหลายอัน
+   ขยายออกแล้วจางหายไป เลียนแบบสัญญาณกระจายตัวตามที่แอปแผนที่ทั่วไปใช้กัน */
+@keyframes user-location-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.user-location-pulse {
+  /* transform-box/origin ต้องระบุเอง เพราะค่าตั้งต้นของ SVG อ้างอิงจาก viewport ไม่ใช่ตัว element
+     ถ้าไม่ตั้ง วงจะขยายออกจากมุมซ้ายบนของแผนที่แทนที่จะขยายจากจุดที่ผู้ใช้ยืนอยู่ */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: user-location-pulse 2.2s ease-out infinite;
+}
+
 /* ผู้ใช้ที่ตั้งค่าลดการเคลื่อนไหวไว้ (มักเพราะเวียนหัวกับอนิเมชั่น) ให้ตัดการเคลื่อนไหวออก
    แต่ยังซูมไปตำแหน่งที่ถูกต้อง — ได้ผลลัพธ์เดิมโดยไม่ต้องดูภาพเคลื่อนไหว */
 @media (prefers-reduced-motion: reduce) {
   .map-zoom,
   .map-zoom-quick {
     transition: none;
+  }
+
+  /* หยุดเต้นแต่ยังคงวงจางไว้ให้เห็น — ไม่ซ่อนทิ้ง เพราะมันช่วยให้หาหมุดตัวเองเจอ */
+  .user-location-pulse {
+    animation: none;
+    opacity: 0.35;
   }
 }
 

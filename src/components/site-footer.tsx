@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ACTIVE_REGION_LABEL } from "@/lib/region-scope";
 import { SITE } from "@/lib/site";
 
 export function SiteFooter() {
@@ -18,7 +19,7 @@ export function SiteFooter() {
           <ul className="mt-2 space-y-1.5">
             <li>
               <Link href="/map" className="text-muted hover:text-foreground">
-                แผนที่งานทั่วไทย
+                แผนที่งาน{ACTIVE_REGION_LABEL}
               </Link>
             </li>
             <li>

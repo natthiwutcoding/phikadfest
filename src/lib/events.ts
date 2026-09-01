@@ -338,6 +338,62 @@ export interface ProvinceEventSummary {
  * ตัวแผนที่วาดครบทุกจังหวัดอยู่แล้วจาก PROVINCE_PATHS จังหวัดที่ไม่อยู่ในผลลัพธ์นี้
  * จะถูกวาดเป็นสีพื้นว่างเปล่า
  */
+/** งานหนึ่งรายการที่มีพิกัด พอสำหรับปักหมุดและแสดงการ์ดเล็กบนแผนที่ */
+export interface MapPinEvent {
+  id: string;
+  slug: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  isAllDay: boolean;
+  venueName?: string;
+  isFree: boolean;
+  priceMin?: number;
+  priceMax?: number;
+  lat: number;
+  lng: number;
+  categoryNameTh: string;
+  categoryEmoji: string;
+  categoryColor: string;
+}
+
+/**
+ * งานที่มีพิกัดจริง สำหรับปักหมุดบนแผนที่
+ *
+ * คัดเฉพาะที่มี lat/lng ครบ — งานที่รู้แค่จังหวัดจะไม่ถูกปักหมุด
+ * เพราะการเดาพิกัดจากจุดกึ่งกลางจังหวัดคือการอ้างความแม่นยำที่เราไม่มี
+ * (งานเหล่านั้นยังนับรวมในสีความหนาแน่นของจังหวัดตามปกติ)
+ */
+export async function listMapPinEvents(
+  filters: Pick<EventFilters, "from" | "to"> = {},
+): Promise<MapPinEvent[]> {
+  const events = await listEvents(filters);
+
+  return events.flatMap((event) => {
+    if (event.lat == null || event.lng == null) return [];
+
+    return [
+      {
+        id: event.id,
+        slug: event.slug,
+        title: event.title,
+        startAt: event.startAt,
+        endAt: event.endAt,
+        isAllDay: event.isAllDay,
+        venueName: event.venueName,
+        isFree: event.isFree,
+        priceMin: event.priceMin,
+        priceMax: event.priceMax,
+        lat: event.lat,
+        lng: event.lng,
+        categoryNameTh: event.category.nameTh,
+        categoryEmoji: event.category.emoji,
+        categoryColor: event.category.accentColor,
+      },
+    ];
+  });
+}
+
 export async function getProvinceEventSummary(
   filters: Pick<EventFilters, "from" | "to"> = {},
 ): Promise<ProvinceEventSummary[]> {

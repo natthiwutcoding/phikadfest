@@ -44,7 +44,13 @@ export function ProvincePanel({
   return (
     <aside
       // มือถือ: แผ่นเลื่อนขึ้นจากด้านล่าง / เดสก์ท็อป: แผงลอยชิดขวาของเวทีแผนที่
-      className="absolute inset-x-0 bottom-0 z-20 max-h-[60%] overflow-y-auto rounded-t-2xl border-t border-line bg-surface/95 p-4 shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.7)] backdrop-blur lg:inset-x-auto lg:top-3 lg:right-3 lg:bottom-3 lg:w-80 lg:max-h-none lg:rounded-2xl lg:border"
+      /*
+        เดสก์ท็อป: ถ้าไม่มีงาน ให้แผงสูงเท่าเนื้อหาแทนการยืดเต็มจอ (ไม่ตั้ง lg:bottom-3)
+        คืนพื้นที่ให้แผนที่ซึ่งเป็นพระเอกของหน้านี้ แทนที่จะเป็นกล่องเปล่าครึ่งจอ
+      */
+      className={`absolute inset-x-0 bottom-0 z-20 max-h-[60%] overflow-y-auto rounded-t-2xl border-t border-line bg-surface/95 p-4 shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.7)] backdrop-blur lg:inset-x-auto lg:top-3 lg:right-3 lg:w-80 lg:max-h-none lg:rounded-2xl lg:border ${
+        totalCount > 0 ? "lg:bottom-3" : "lg:bottom-auto"
+      }`}
       aria-label={`งานในจังหวัด${province.nameTh}`}
     >
       <div className="flex items-start justify-between gap-3">

@@ -5,6 +5,7 @@ import { HeroGlow } from "@/components/hero-glow";
 import { NearbyEvents } from "@/components/nearby-events";
 import { CATEGORIES } from "@/lib/data/categories";
 import { countEventsByCategory, listEvents, listProvincesWithEvents } from "@/lib/events";
+import { ACTIVE_PROVINCES, ACTIVE_REGION_LABEL } from "@/lib/region-scope";
 
 export default async function HomePage() {
   const [upcoming, categoryCounts, provinces] = await Promise.all([
@@ -20,13 +21,25 @@ export default async function HomePage() {
       <section className="relative py-6 text-center sm:py-10">
         <HeroGlow />
 
-        <h1 className="text-4xl leading-tight font-bold tracking-tight text-balance sm:text-5xl">
+        {/*
+          ป้ายบอกขอบเขตพื้นที่วางไว้เหนือหัวข้อ — บอกตั้งแต่วินาทีแรกว่าเว็บนี้ครอบคลุมที่ไหน
+          ผู้ใช้จะได้ไม่เสียเวลาค้นหางานในภาคที่เรายังไม่มีข้อมูล และเป็นคำที่ Google
+          ใช้จัดหมวดหน้านี้ด้วย (คนค้น "งานเทศกาลภาคตะวันออก" จริง)
+        */}
+        <p className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-sm text-muted">
+          <span aria-hidden>📍</span> {ACTIVE_REGION_LABEL}
+        </p>
+
+        <h1 className="mt-4 text-4xl leading-tight font-bold tracking-tight text-balance sm:text-5xl">
           มีงานอะไรน่าไปบ้าง
           <span className="mt-1 block text-brand-400">ใกล้คุณตอนนี้</span>
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-muted text-pretty">
-          งานประจำปี คอนเสิร์ต เวิร์กช็อป คาร์มีท และอีกหลายอย่างทั่วประเทศ
+          งานประจำปี คอนเสิร์ต เวิร์กช็อป คาร์มีท และอีกหลายอย่างใน{ACTIVE_REGION_LABEL}
           รวมไว้ที่เดียว ดูวันเวลาและสถานที่ได้ครบก่อนออกเดินทาง
+        </p>
+        <p className="mx-auto mt-2 max-w-xl text-sm text-muted">
+          {ACTIVE_PROVINCES.map((province) => province.nameTh).join(" · ")}
         </p>
       </section>
 

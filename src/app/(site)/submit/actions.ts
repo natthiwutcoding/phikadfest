@@ -4,6 +4,9 @@ import { getCategory } from "@/lib/data/categories";
 import { getProvince } from "@/lib/data/provinces";
 import { USING_SAMPLE_DATA } from "@/lib/events";
 import type { SubmitState } from "@/lib/form-state";
+import { pointMatchesProvince } from "@/lib/map-camera";
+import { resolveMapLink } from "@/lib/map-link";
+import { ACTIVE_REGION_LABEL, isProvinceInScope } from "@/lib/region-scope";
 import { createEventSlug } from "@/lib/slug";
 import { createSupabaseAdminClient, SERVICE_ROLE_CONFIGURED } from "@/lib/supabase/admin";
 
@@ -11,6 +14,18 @@ function text(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
 }
+
+/** ชนิดไฟล์รูปที่รับ — ต้องตรงกับ allowed_mime_types ของ bucket ใน migration 0004 */
+const COVER_IMAGE_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+/** เพดานขนาดไฟล์รูป — ต้องตรงกับ file_size_limit ของ bucket ใน migration 0004 */
+const COVER_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+const COVER_BUCKET = "event-covers";
 
 /**
  * รับงานที่ผู้ใช้ส่งเข้ามา
@@ -36,6 +51,22 @@ export async function submitEvent(
   const endDate = text(formData, "endDate");
   const contact = text(formData, "contact");
   const sourceUrl = text(formData, "sourceUrl");
+  const mapLink = text(formData, "mapLink");
+
+  /*
+    ช่องรูปไม่บังคับ — เบราว์เซอร์ส่ง File ที่ size เป็น 0 มาให้เสมอแม้ผู้ใช้ไม่ได้เลือกไฟล์
+    จึงต้องเช็ค size > 0 ด้วย ไม่ใช่แค่ instanceof File
+  */
+  const rawCover = formData.get("coverImage");
+  const coverImage = rawCover instanceof File && rawCover.size > 0 ? rawCover : null;
+
+  if (coverImage) {
+    if (!COVER_IMAGE_TYPES[coverImage.type]) {
+      errors.coverImage = "รองรับเฉพาะไฟล์ JPG PNG และ WebP";
+    } else if (coverImage.size > COVER_IMAGE_MAX_BYTES) {
+      errors.coverImage = "ไฟล์ใหญ่เกินไป ต้องไม่เกิน 5MB";
+    }
+  }
 
   if (title.length < 5) errors.title = "ใส่ชื่องานอย่างน้อย 5 ตัวอักษร";
   if (title.length > 200) errors.title = "ชื่องานยาวเกินไป (ไม่เกิน 200 ตัวอักษร)";
@@ -45,7 +76,17 @@ export async function submitEvent(
   }
 
   if (!getCategory(categorySlug)) errors.category = "เลือกหมวดหมู่งาน";
-  if (!getProvince(provinceSlug)) errors.province = "เลือกจังหวัดที่จัดงาน";
+
+  /*
+    ต้องตรวจ "อยู่ในภาคที่เปิดรับ" ที่ฝั่งเซิร์ฟเวอร์ด้วย ไม่ใช่พึ่งแค่ dropdown ที่กรองไว้แล้ว
+    เพราะ dropdown เป็นแค่ HTML ที่แก้ได้จากฝั่งผู้ใช้ ยิง request ตรงมาเลือกจังหวัดไหนก็ได้
+    (หลักเดียวกับที่ไฟล์นี้ยึดอยู่แล้วเรื่อง required/minlength)
+  */
+  if (!getProvince(provinceSlug)) {
+    errors.province = "เลือกจังหวัดที่จัดงาน";
+  } else if (!isProvinceInScope(provinceSlug)) {
+    errors.province = `ตอนนี้เปิดรับเฉพาะงานใน${ACTIVE_REGION_LABEL}`;
+  }
   if (venueName.length < 3) errors.venueName = "ระบุชื่อสถานที่จัดงาน";
 
   if (!startDate) {
@@ -105,6 +146,44 @@ export async function submitEvent(
   const category = getCategory(categorySlug)!;
 
   /*
+    ลิงก์แผนที่ไม่บังคับ และตั้งใจไม่ให้ทำทั้งฟอร์มพังถ้าแปลงไม่ได้
+    เพราะงานที่ไม่มีพิกัดก็ยังมีประโยชน์ (นับรวมในสีจังหวัดบนแผนที่ได้)
+    ดีกว่าปฏิเสธทั้งใบเพราะลิงก์ที่เป็นแค่ข้อมูลเสริม
+  */
+  let lat: number | null = null;
+  let lng: number | null = null;
+
+  if (mapLink) {
+    const resolved = await resolveMapLink(mapLink);
+
+    if (resolved.ok) {
+      /*
+        ค้านเมื่อพิกัดไม่เข้ากับจังหวัดที่เลือก — มักเกิดจากก๊อปลิงก์ผิดที่
+
+        ห้ามเทียบ resolved.province ตรงๆ เพราะค่านั้นหาจากระยะถึงตัวเมือง ซึ่งตอบผิด
+        สำหรับพัทยา จอมเทียน และสัตหีบ (อยู่ชลบุรี แต่ใกล้ตัวเมืองระยองมากกว่า)
+        — คือสถานที่จัดงานที่คนแจ้งเข้ามาบ่อยที่สุดในภาคนี้ ดูรายละเอียดใน pointMatchesProvince()
+      */
+      if (!pointMatchesProvince(province.code, resolved.lat, resolved.lng)) {
+        return {
+          status: "error",
+          message: `ลิงก์แผนที่ชี้ไปที่${resolved.province.nameTh} แต่เลือกจังหวัดเป็น${province.nameTh} — ตรวจสอบอีกครั้ง`,
+          errors: { mapLink: `พิกัดในลิงก์อยู่ใน${resolved.province.nameTh}` },
+        };
+      }
+
+      lat = resolved.lat;
+      lng = resolved.lng;
+    } else {
+      return {
+        status: "error",
+        message: "ลิงก์แผนที่ใช้ไม่ได้",
+        errors: { mapLink: resolved.reason },
+      };
+    }
+  }
+
+  /*
     ฟอร์มสาธารณะรับแค่วันที่ ไม่รับเวลา จึงบันทึกเป็นงานแบบ "ไม่ระบุเวลา" (is_all_day)
     และตรึงเวลาเป็นเขตเวลาไทยชัดเจน ไม่ปล่อยให้ Postgres ตีความเป็น UTC
     ซึ่งจะทำให้วันคลาดไปหนึ่งวันสำหรับผู้ใช้ในไทย
@@ -119,6 +198,32 @@ export async function submitEvent(
   */
   const supabase = createSupabaseAdminClient();
 
+  /*
+    อัปโหลดรูปปก (ถ้ามี)
+
+    ตั้งใจให้ล้มเหลวแบบไม่ทำให้ทั้งฟอร์มพัง — งานที่ไม่มีรูปก็ยังมีประโยชน์เต็มที่
+    การ์ดมีภาพประกอบสำรองอยู่แล้ว จึงไม่คุ้มที่จะทิ้งข้อมูลงานที่กรอกมาครบ
+    เพราะ Storage มีปัญหาชั่วคราว
+  */
+  let coverImageUrl: string | null = null;
+
+  if (coverImage) {
+    const extension = COVER_IMAGE_TYPES[coverImage.type];
+    // ชื่อไฟล์สุ่มจากฝั่งเซิร์ฟเวอร์ ไม่เอาชื่อเดิมของผู้ใช้มาใช้
+    // เพราะชื่อไฟล์ที่ผู้ใช้ตั้งอาจมีอักขระที่ทำให้ path เพี้ยน หรือชนกันเองได้
+    const path = `${crypto.randomUUID()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(COVER_BUCKET)
+      .upload(path, coverImage, { contentType: coverImage.type });
+
+    if (uploadError) {
+      console.error("[submit] อัปโหลดรูปปกไม่สำเร็จ:", uploadError.message);
+    } else {
+      coverImageUrl = supabase.storage.from(COVER_BUCKET).getPublicUrl(path).data.publicUrl;
+    }
+  }
+
   const { error } = await supabase.from("events").insert({
     slug: createEventSlug(title),
     title,
@@ -126,6 +231,9 @@ export async function submitEvent(
     category_id: category.id,
     province_id: province.id,
     venue_name: venueName,
+    lat,
+    lng,
+    cover_image_url: coverImageUrl,
     start_at: startAt,
     end_at: endAt,
     is_all_day: true,

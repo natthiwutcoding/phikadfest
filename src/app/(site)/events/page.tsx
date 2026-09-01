@@ -6,6 +6,7 @@ import { EventFilters, type FilterValues } from "@/components/event-filters";
 import { getCategory } from "@/lib/data/categories";
 import { getProvince } from "@/lib/data/provinces";
 import { listEvents } from "@/lib/events";
+import { ACTIVE_REGION_LABEL } from "@/lib/region-scope";
 
 /** searchParams ให้ค่ามาเป็น string | string[] เสมอ — หน้านี้สนใจแค่ค่าเดียว */
 function one(value: string | string[] | undefined): string | undefined {
@@ -33,7 +34,7 @@ function buildHeading(filters: FilterValues): string {
   const province = filters.province ? getProvince(filters.province) : undefined;
 
   const subject = category ? `งาน${category.nameTh.split(" / ")[0]}` : "งานทั้งหมด";
-  const place = province ? ` ใน${province.nameTh}` : " ทั่วประเทศ";
+  const place = province ? ` ใน${province.nameTh}` : ` ${ACTIVE_REGION_LABEL}`;
 
   return `${subject}${place}`;
 }

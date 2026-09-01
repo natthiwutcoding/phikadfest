@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { submitEvent } from "@/app/(site)/submit/actions";
 import { INITIAL_SUBMIT_STATE } from "@/lib/form-state";
 import { CATEGORIES } from "@/lib/data/categories";
-import { PROVINCES_BY_REGION } from "@/lib/data/provinces";
+import { ACTIVE_PROVINCES, ACTIVE_REGION_LABEL } from "@/lib/region-scope";
 
 // min-h-11 (44px) คือความสูงขั้นต่ำที่กดง่ายด้วยนิ้วบนจอมือถือ ตามมาตรฐาน Apple/Google
 const fieldClass =
@@ -80,20 +80,23 @@ export function SubmitForm() {
 
         <label className="block">
           <span className="font-medium">จังหวัด *</span>
+          {/*
+            เหลือภาคเดียวจึงไม่ต้องมี <optgroup> แล้ว — การจัดกลุ่มที่มีกลุ่มเดียว
+            เพิ่มความรกโดยไม่ช่วยให้หาง่ายขึ้น
+          */}
           <select name="province" required defaultValue="" className={fieldClass}>
             <option value="" disabled>
               เลือกจังหวัด
             </option>
-            {PROVINCES_BY_REGION.map((group) => (
-              <optgroup key={group.region} label={group.label}>
-                {group.provinces.map((province) => (
-                  <option key={province.slug} value={province.slug}>
-                    {province.nameTh}
-                  </option>
-                ))}
-              </optgroup>
+            {ACTIVE_PROVINCES.map((province) => (
+              <option key={province.slug} value={province.slug}>
+                {province.nameTh}
+              </option>
             ))}
           </select>
+          <span className="mt-1 block text-sm text-muted">
+            ตอนนี้เปิดรับเฉพาะงานใน{ACTIVE_REGION_LABEL}
+          </span>
           <FieldError message={errors.province} />
         </label>
       </div>
@@ -109,6 +112,21 @@ export function SubmitForm() {
         <FieldError message={errors.venueName} />
       </label>
 
+      <label className="block">
+        <span className="font-medium">ลิงก์ Google Maps ของสถานที่</span>
+        <input
+          name="mapLink"
+          type="url"
+          placeholder="https://maps.app.goo.gl/..."
+          className={fieldClass}
+        />
+        <span className="mt-1 block text-sm text-muted">
+          ใส่แล้วงานจะขึ้นเป็นหมุดบนแผนที่ ทำให้คนหาเจอง่ายขึ้นมาก — เปิด Google Maps
+          หาสถานที่ กดปุ่ม &quot;แชร์&quot; แล้วก๊อปลิงก์มาวาง
+        </span>
+        <FieldError message={errors.mapLink} />
+      </label>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="block">
           <span className="font-medium">วันที่เริ่ม *</span>
@@ -122,6 +140,25 @@ export function SubmitForm() {
           <FieldError message={errors.endDate} />
         </label>
       </div>
+
+      <label className="block">
+        <span className="font-medium">รูปปกงาน</span>
+        {/*
+          accept กรองในหน้าต่างเลือกไฟล์เพื่อความสะดวก แต่ตัวที่บังคับจริงคือ
+          การตรวจฝั่งเซิร์ฟเวอร์ และ allowed_mime_types ที่ระดับ Storage bucket
+        */}
+        <input
+          type="file"
+          name="coverImage"
+          accept="image/jpeg,image/png,image/webp"
+          className="mt-1 block w-full text-sm text-muted file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-surface-muted file:px-4 file:font-medium file:text-foreground hover:file:bg-surface"
+        />
+        <span className="mt-1 block text-sm text-muted">
+          ไม่ใส่ก็ได้ — ถ้าไม่มีรูป ระบบจะสร้างภาพประกอบให้อัตโนมัติ · รองรับ JPG PNG WebP
+          ขนาดไม่เกิน 5MB
+        </span>
+        <FieldError message={errors.coverImage} />
+      </label>
 
       <label className="block">
         <span className="font-medium">ช่องทางติดต่อผู้จัด *</span>

@@ -16,7 +16,7 @@ export function EventCard({ event }: { event: EventWithRelations }) {
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-surface transition-shadow hover:shadow-[0_0_0_1px_var(--color-line),0_12px_32px_-12px_rgba(0,0,0,0.6)]">
-      <EventCover category={event.category} />
+      <EventCover category={event.category} imageUrl={event.coverImageUrl} />
 
       {relative ? (
         <span className="absolute top-3 right-3 rounded-full bg-brand-600 px-2.5 py-1 text-xs font-medium text-white glow-brand">

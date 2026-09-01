@@ -11,6 +11,8 @@ interface Props {
   range: DateRangeKey;
   /** slug จังหวัดที่เลือกอยู่ ต้องพาไปด้วยเวลาเปลี่ยนช่วงเวลา */
   province?: string;
+  /** จำนวนงานทั้งหมดในช่วงเวลาที่เลือก */
+  totalEvents: number;
 }
 
 /**
@@ -23,7 +25,7 @@ interface Props {
  * ใช้ soft navigation แบบเดียวกับ src/components/event-filters.tsx
  * คือเปลี่ยน URL แต่ไม่โหลดหน้าใหม่ทั้งหน้า
  */
-export function MapControls({ range, province }: Props) {
+export function MapControls({ range, province, totalEvents }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -41,15 +43,21 @@ export function MapControls({ range, province }: Props) {
   return (
     <div
       aria-busy={isPending}
-      className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-line bg-surface/90 p-2 backdrop-blur"
+      className="pointer-events-auto rounded-2xl border border-line bg-surface/90 p-2 backdrop-blur"
     >
-      <span className="shrink-0 pl-1 text-xs font-medium text-muted">ช่วงเวลา</span>
-      <div className="flex gap-1.5">
-        {RANGES.map((value) => (
-          <Chip key={value} active={range === value} onClick={() => apply(value)}>
-            {DATE_RANGE_LABELS[value]}
-          </Chip>
-        ))}
+      <p className="px-1 pb-1.5 text-sm font-semibold">
+        พบ {totalEvents.toLocaleString("th-TH")} งาน
+      </p>
+
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 pl-1 text-xs font-medium text-muted">ช่วงเวลา</span>
+        <div className="flex gap-1.5">
+          {RANGES.map((value) => (
+            <Chip key={value} active={range === value} onClick={() => apply(value)}>
+              {DATE_RANGE_LABELS[value]}
+            </Chip>
+          ))}
+        </div>
       </div>
     </div>
   );

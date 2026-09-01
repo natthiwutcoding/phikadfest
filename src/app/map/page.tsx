@@ -6,14 +6,14 @@ import { ProvincePanel } from "@/components/map/province-panel";
 import { ThailandMap } from "@/components/map/thailand-map";
 import { getProvince } from "@/lib/data/provinces";
 import { parseDateRange, resolveDateRange } from "@/lib/date-range";
-import { getProvinceEventSummary, listEvents } from "@/lib/events";
+import { getProvinceEventSummary, listEvents, listMapPinEvents } from "@/lib/events";
+import { ACTIVE_REGION_LABEL } from "@/lib/region-scope";
 
 const PANEL_EVENT_LIMIT = 5;
 
 export const metadata: Metadata = {
-  title: "แผนที่งานทั่วไทย",
-  description:
-    "ดูว่าจังหวัดไหนมีงานเทศกาลหรือกิจกรรมกำลังจะจัดบ้าง กดที่จังหวัดบนแผนที่เพื่อดูรายละเอียด",
+  title: `แผนที่งาน${ACTIVE_REGION_LABEL}`,
+  description: `ดูว่าจังหวัดไหนใน${ACTIVE_REGION_LABEL}มีงานเทศกาลหรือกิจกรรมกำลังจะจัดบ้าง กดที่จังหวัดบนแผนที่เพื่อดูรายละเอียด`,
   alternates: { canonical: "/map" },
 };
 
@@ -32,12 +32,16 @@ export default async function MapPage(props: PageProps<"/map">) {
   const dateRange = resolveDateRange(range);
 
   // ดึงพร้อมกัน: สรุปรายจังหวัดสำหรับระบายสีแผนที่ + งานของจังหวัดที่เลือกสำหรับแผงข้าง
-  const [summary, provinceEvents] = await Promise.all([
+  const [summary, provinceEvents, pinEvents] = await Promise.all([
     getProvinceEventSummary(dateRange),
     province
       ? listEvents({ ...dateRange, provinceSlug: province.slug })
       : Promise.resolve([]),
+    listMapPinEvents(dateRange),
   ]);
+
+  /** จำนวนงานทั้งหมดในช่วงเวลาที่เลือก — แสดงบนแถบควบคุมแบบเดียวกับที่ JobThai ทำ */
+  const totalEvents = summary.reduce((sum, item) => sum + item.count, 0);
 
   /** ฟิลเตอร์ปัจจุบันโดยไม่รวมจังหวัด — ใช้ตอนเปลี่ยนจังหวัดหรือปิดแผง */
   const baseParams = new URLSearchParams();
@@ -57,14 +61,15 @@ export default async function MapPage(props: PageProps<"/map">) {
       h-full ทำงานได้เพราะ <main> ในไฟล์ layout.tsx ตั้ง flex-1 กับ min-h-0 ไว้แล้ว
     */
     <section
-      aria-label="แผนที่งานทั่วประเทศ"
+      aria-label={`แผนที่งาน${ACTIVE_REGION_LABEL}`}
       className="relative h-full w-full overflow-hidden bg-surface"
     >
       {/* h1 ซ่อนจากสายตาแต่ยังอยู่ให้ screen reader และบอทอ่าน เพราะหน้านี้ไม่มีที่ว่างให้หัวข้อ */}
-      <h1 className="sr-only">แผนที่งานเทศกาลและกิจกรรมทั่วไทย</h1>
+      <h1 className="sr-only">แผนที่งานเทศกาลและกิจกรรม{ACTIVE_REGION_LABEL}</h1>
 
       <ThailandMap
         summary={summary}
+        pinEvents={pinEvents}
         selectedCode={province?.code}
         baseParams={baseParams.toString()}
       />
@@ -72,7 +77,7 @@ export default async function MapPage(props: PageProps<"/map">) {
       {/* กลุ่มควบคุมมุมบนซ้าย — ค้นหาจังหวัดสำหรับคนที่รู้อยู่แล้วว่าจะไปไหน แล้วตามด้วยตัวกรอง */}
       <div className="pointer-events-none absolute top-3 left-3 z-20 flex w-64 flex-col gap-2 sm:w-72">
         <ProvinceSearch baseParams={baseParams.toString()} />
-        <MapControls range={range} province={province?.slug} />
+        <MapControls range={range} province={province?.slug} totalEvents={totalEvents} />
       </div>
 
       <ProvincePanel

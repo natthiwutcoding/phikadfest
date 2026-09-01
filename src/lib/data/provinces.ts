@@ -130,7 +130,8 @@ export function getProvince(slug: string): Province | undefined {
   return BY_SLUG.get(slug);
 }
 
-const REGION_LABELS: Record<Region, string> = {
+/** ชื่อภาคที่แสดงบนหน้าเว็บ — `region-scope.ts` ใช้ตั้งชื่อขอบเขตที่เปิดรับงานอยู่ */
+export const REGION_LABELS: Record<Region, string> = {
   north: "ภาคเหนือ",
   northeast: "ภาคอีสาน",
   central: "ภาคกลาง",

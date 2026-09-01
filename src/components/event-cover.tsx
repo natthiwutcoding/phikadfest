@@ -1,17 +1,45 @@
+import Image from "next/image";
+
 import type { Category } from "@/lib/types";
 
 /**
- * ภาพประกอบด้านบนการ์ดงาน — สร้างด้วย SVG ล้วน ไม่พึ่งพาภาพถ่ายจากภายนอก
+ * ภาพประกอบด้านบนการ์ดงาน
  *
- * เหตุผลที่เลือกทางนี้แทนภาพถ่ายสต็อกจากเน็ต (เช่น Unsplash):
- *  1. ไม่มีทางลิงก์เสีย หรือได้ภาพที่ไม่ตรงกับหมวดหมู่งาน
- *  2. ควบคุมโทนสีให้เข้ากับธีม Dark ได้เป๊ะ (ไล่สีตาม accentColor ของแต่ละหมวดหมู่)
- *  3. ไม่ต้องตั้งค่า remote image domain หรือโหลดภาพจากเซิร์ฟเวอร์อื่น
+ * มีรูปจริงที่ผู้แจ้งงานอัปโหลดมา → แสดงรูปนั้น
+ * ไม่มี → วาดภาพประกอบไล่สีด้วย SVG ตามสี accent ของหมวดหมู่
  *
- * เมื่อมี event.coverImageUrl จริง (หลังต่อ Supabase Storage แล้ว) ให้ใช้ <Image> แสดงแทนที่นี่
+ * เหตุผลที่ยังเก็บ SVG ไว้เป็นตัวสำรอง แทนการปล่อยว่างหรือใช้ภาพสต็อกจากเน็ต:
+ *  1. งานส่วนใหญ่ช่วงแรกจะยังไม่มีรูป การ์ดต้องดูดีตั้งแต่วันแรกโดยไม่ต้องรอรูป
+ *  2. ควบคุมโทนสีให้เข้ากับธีม Dark ได้เป๊ะ ไม่มีทางได้ภาพที่ไม่ตรงหมวดหมู่
+ *  3. ไม่มีลิงก์เสีย เพราะไม่ได้พึ่งเซิร์ฟเวอร์ของใคร
  */
-export function EventCover({ category }: { category: Category }) {
+export function EventCover({
+  category,
+  imageUrl,
+  /** true เมื่อเป็นรูปหลักที่เห็นตั้งแต่เปิดหน้า (หน้ารายละเอียดงาน) — ช่วยให้ LCP เร็วขึ้น */
+  priority = false,
+}: {
+  category: Category;
+  imageUrl?: string;
+  priority?: boolean;
+}) {
   const gradientId = `cover-${category.slug}`;
+
+  if (imageUrl) {
+    return (
+      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-2xl bg-surface-muted">
+        <Image
+          src={imageUrl}
+          alt=""
+          fill
+          // การ์ดกว้างสุด ~1 ใน 3 ของ container 1152px บนจอใหญ่ เต็มความกว้างบนมือถือ
+          sizes="(min-width: 1024px) 384px, 100vw"
+          priority={priority}
+          className="object-cover"
+        />
+      </div>
+    );
+  }
 
   return (
     <div

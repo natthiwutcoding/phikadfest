@@ -1,6 +1,7 @@
 import { PROVINCES } from "@/lib/data/provinces";
 import {
   MAP_HEIGHT,
+  MAP_PROJECTION,
   MAP_WIDTH,
   PROVINCE_BBOXES,
   PROVINCE_LABEL_ANCHORS,
@@ -37,8 +38,17 @@ export interface Viewport {
   height: number;
 }
 
-/** ซูมเข้าสุด — กันจังหวัดเล็ก (ภูเก็ตสูงแค่ 32 หน่วย) ซูมจนรูปร่างแตก */
-const MIN_VISIBLE_HEIGHT = 45;
+/**
+ * ซูมเข้าสุด — เห็นพื้นที่สูงราว 30 กม. ประมาณขนาดเมืองพัทยาทั้งเมือง
+ *
+ * เคยตั้งไว้ที่ 130 (~194 กม.) ด้วยเหตุผลว่าซูมลึกกว่านั้นจะเจอแต่พื้นที่สีเรียบๆ ไม่มีอะไรดู
+ * **เหตุผลนั้นใช้ไม่ได้แล้ว** เพราะตอนนี้แผนที่มีหมุดงานและชื่องานข้างหมุด — และการซูมลึก
+ * คือวิธีเดียวที่ทำให้กลุ่มหมุดที่ทับกันแตกออกจากกัน
+ *
+ * ผลพลอยได้ที่สำคัญ: ช่องจัดกลุ่มหมุด (CLUSTER_CELL_PX ใน thailand-map.tsx) ที่ระดับนี้
+ * เท่ากับราว 1.8 กม. จากเดิม ~11 กม. งานคนละที่ในเมืองเดียวกันจึงแยกหมุดออกจากกันได้จริง
+ */
+const MIN_VISIBLE_HEIGHT = 20;
 
 /** ซูมออกสุด — เห็นทั้งประเทศพอดี */
 const MAX_VISIBLE_HEIGHT = MAP_HEIGHT;
@@ -57,6 +67,14 @@ export const ZOOM_STEP = 1.6;
 
 /** เผื่อขอบรอบจังหวัดตอนซูมเข้า — 1 คือชิดพอดี มากกว่านั้นเห็นจังหวัดข้างเคียงด้วย */
 const PROVINCE_ZOOM_PADDING = 1.5;
+
+/**
+ * เผื่อขอบรอบทั้งภาค — น้อยกว่าของจังหวัดเดียวมาก
+ *
+ * พื้นที่ระดับภาคกว้างอยู่แล้ว ถ้าเผื่อเท่าจังหวัด (1.5) ภาพจะถอยห่างจนภาคที่เป็นพระเอก
+ * กลายเป็นจุดเล็กๆ กลางประเทศ ตั้ง 1.12 ให้เห็นขอบภาคครบพร้อมบริบทรอบข้างนิดหน่อย
+ */
+const REGION_ZOOM_PADDING = 1.12;
 
 /** ไกลกว่านี้จากทุกจังหวัดถือว่าอยู่นอกประเทศไทย */
 const MAX_DISTANCE_FROM_THAILAND_M = 300_000;
@@ -204,6 +222,71 @@ export function cameraFitProvince(code: string, viewport: Viewport): Camera | nu
   );
 }
 
+/**
+ * กล้องที่เล็งจุดใดจุดหนึ่งบนแผนที่ ที่ระดับซูมที่ขอมา
+ *
+ * ใช้ตอนกดกลุ่มหมุดเพื่อซูมเข้าไปดูสมาชิกข้างใน ต่างจาก cameraOnProvince ตรงที่
+ * เล็งพิกัดตรงๆ ไม่ผูกกับจังหวัด และผู้เรียกเป็นคนกำหนดระดับซูมเอง
+ *
+ * ค่าที่ขอมาถูก clampCamera บีบให้อยู่ในเพดานเสมอ ผู้เรียกจึงต้องอ่านค่าที่คืนกลับไป
+ * ไปคิดต่อ ไม่ใช่สมมติว่าได้ visibleHeight ตามที่ขอ
+ */
+export function cameraOnPoint(
+  point: { x: number; y: number },
+  visibleHeight: number,
+  viewport: Viewport,
+): Camera {
+  return clampCamera({ cx: point.x, cy: point.y, visibleHeight }, viewport);
+}
+
+/**
+ * กล้องที่ซูมให้เห็นทุกจังหวัดในรายการพอดี — ใช้ตั้งมุมมองเริ่มต้นของภาคที่เปิดรับงาน
+ *
+ * รวม bounding box ของทุกจังหวัดเข้าด้วยกันก่อน แล้วค่อยคำนวณแบบเดียวกับ cameraFitProvince
+ * ต่างกันแค่ที่ "ไม่จำกัดด้วย REGION_VISIBLE_HEIGHT" เพราะภาคย่อมกว้างกว่าจังหวัดเดียวเสมอ
+ * ถ้าไปตัดด้วยเพดานนั้นจะเห็นไม่ครบทั้งภาค
+ *
+ * เล็งกึ่งกลาง bbox รวม ไม่ใช่ pole of inaccessibility เหมือนตอนโฟกัสจังหวัดเดียว
+ * เพราะที่นี่ต้องการ "เห็นครบ" ไม่ใช่ "เล็งให้ตรงกลางพื้นที่"
+ */
+export function cameraFitProvinces(codes: string[], viewport: Viewport): Camera | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const code of codes) {
+    const bbox = PROVINCE_BBOXES[code];
+    if (!bbox) continue;
+
+    const [x, y, width, height] = bbox;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
+  }
+
+  if (!Number.isFinite(minX)) return null;
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const aspect = viewport.height > 0 ? viewport.width / viewport.height : 1;
+
+  return clampCamera(
+    {
+      cx: minX + width / 2,
+      cy: minY + height / 2,
+      // ต้องพอดีทั้งสองแกน เหมือน cameraFitProvince — เลือกความสูงที่มากกว่าระหว่าง
+      // "สูงพอใส่พื้นที่" กับ "สูงพอที่ความกว้างจะใส่พื้นที่ได้"
+      visibleHeight: Math.max(
+        height * REGION_ZOOM_PADDING,
+        (width * REGION_ZOOM_PADDING) / aspect,
+      ),
+    },
+    viewport,
+  );
+}
+
 /** ปรับระดับซูมโดยยังเล็งจุดเดิม — ใช้กับปุ่ม + / − */
 export function zoomBy(camera: Camera, factor: number, viewport: Viewport): Camera {
   return clampCamera({ ...camera, visibleHeight: camera.visibleHeight / factor }, viewport);
@@ -267,11 +350,95 @@ export function cameraWholeCountry(): Camera {
   return { cx: MAP_CENTER_X, cy: MAP_CENTER_Y, visibleHeight: MAX_VISIBLE_HEIGHT };
 }
 
+/**
+ * แปลงพิกัดภูมิศาสตร์ (lat/lng) เป็นตำแหน่งบนแผนที่ SVG
+ *
+ * ⚠️ สูตรตรงนี้ต้องเหมือนกับใน scripts/build-province-paths.mjs ทุกตัวอักษร
+ * เพราะรูปร่างจังหวัดถูกแปลงด้วยสูตรนั้นตอน build ถ้าที่นี่คำนวณต่างไปแม้นิดเดียว
+ * หมุดงานจะไม่ตรงกับจังหวัดที่มันควรอยู่ — ค่าคงที่จึงดึงมาจากไฟล์ที่ generate มาด้วยกัน
+ */
+export function projectToMap(lng: number, lat: number): { x: number; y: number } {
+  const x = (lng + 180) / 360;
+  const sinLat = Math.sin((lat * Math.PI) / 180);
+  const y = 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
+
+  return {
+    x: (x - MAP_PROJECTION.minX) * MAP_PROJECTION.scale,
+    y: (y - MAP_PROJECTION.minY) * MAP_PROJECTION.scale,
+  };
+}
+
+/**
+ * แปลงตำแหน่งบนแผนที่กลับเป็นพิกเซลบนจอ
+ *
+ * ใช้วางการ์ดงาน (HTML) ให้ตรงกับหมุด (SVG) เพราะทั้งสองอยู่คนละระบบพิกัด
+ * เป็นผกผันของการ transform ที่ใช้ใน toTransform()
+ */
+export function mapToScreen(
+  point: { x: number; y: number },
+  camera: Camera,
+  viewport: Viewport,
+): { x: number; y: number } {
+  const factor = coverFactor(viewport) * scaleFor(camera, viewport);
+
+  return {
+    x: viewport.width / 2 + (point.x - camera.cx) * factor,
+    y: viewport.height / 2 + (point.y - camera.cy) * factor,
+  };
+}
+
 /** แปลงระยะที่ลากบนจอ (พิกเซล) เป็นระยะในระบบพิกัดแผนที่ */
 export function pixelsToMapUnits(deltaPx: number, camera: Camera, viewport: Viewport): number {
   const scale = scaleFor(camera, viewport);
   const factor = coverFactor(viewport) * scale;
   return factor === 0 ? deltaPx : deltaPx / factor;
+}
+
+/**
+ * พิกัดนี้อยู่ในกรอบสี่เหลี่ยมของจังหวัดนี้หรือไม่
+ *
+ * ── ทำไมไม่ใช้ findNearestProvince ตรวจแทน ──
+ * findNearestProvince เทียบกับ "พิกัดตัวเมือง" ซึ่งพลาดกับจังหวัดที่ตัวเมืองอยู่สุดขอบ
+ * ตัวอย่างจริง: พัทยา/จอมเทียน (12.888, 100.874) อยู่ในชลบุรีแน่นอน แต่ห่างจากตัวเมือง
+ * ชลบุรี 54 กม. ขณะที่ห่างจากตัวเมืองระยองแค่ 50 กม. — ฟังก์ชันนั้นจึงตอบว่า "ระยอง"
+ *
+ * เรื่องนี้สำคัญมากกับฟอร์มแจ้งงาน เพราะพัทยาคือสถานที่จัดงานที่คนแจ้งเข้ามาบ่อยที่สุด
+ * ในภาคตะวันออก ถ้าใช้ระยะทางตัดสิน คนแจ้งงานพัทยาจะถูกปฏิเสธทั้งที่กรอกถูกทุกอย่าง
+ *
+ * ── ทำไมใช้แค่กรอบสี่เหลี่ยม ไม่ใช่รูปร่างจริง ──
+ * ต้องการแค่ "ค้านเมื่อผิดจังหวัดแบบชัดเจน" ไม่ได้ต้องการความแม่นระดับเส้นเขตแดน
+ * กรอบสี่เหลี่ยมกว้างกว่าเขตจริงเล็กน้อย จึงอนุโลมจุดที่อยู่ริมขอบให้ผ่าน ซึ่งเป็นฝั่งที่
+ * ปลอดภัยกว่าสำหรับฟอร์มสาธารณะ — ปฏิเสธงานจริงผิดๆ เสียหายกว่ารับงานที่พิกัดคลาดไปนิด
+ */
+function isPointInProvinceBounds(code: string, lat: number, lng: number): boolean {
+  const bbox = PROVINCE_BBOXES[code];
+  if (!bbox) return false;
+
+  const [x, y, width, height] = bbox;
+  const point = projectToMap(lng, lat);
+
+  return point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + height;
+}
+
+/**
+ * พิกัดนี้เข้ากันได้กับจังหวัดที่ผู้ใช้เลือกหรือไม่ — ใช้ตรวจลิงก์แผนที่ในฟอร์มแจ้งงาน
+ *
+ * ใช้สองวิธีร่วมกันแล้วยอมรับถ้า "วิธีใดวิธีหนึ่ง" ผ่าน เพราะแต่ละวิธีมีจุดบอดคนละแบบ
+ * และการปฏิเสธงานจริงผิดๆ เสียหายกว่าการรับพิกัดที่คลาดไปเล็กน้อย:
+ *
+ * | วิธี | จุดบอด | ตัวอย่างที่พลาด |
+ * |---|---|---|
+ * | กรอบเขตจังหวัด | เกาะที่อยู่นอกรูปหลายเหลี่ยมของจังหวัด | เกาะเสม็ด (ระยอง) |
+ * | ระยะถึงตัวเมือง | จังหวัดที่ตัวเมืองอยู่สุดขอบ | พัทยา จอมเทียน สัตหีบ (ชลบุรี) |
+ *
+ * ทั้งสองกรณีเป็นสถานที่จัดงานยอดนิยมของภาคตะวันออก ถ้าใช้วิธีเดียวจะปฏิเสธคนแจ้งงาน
+ * ที่กรอกถูกทุกอย่าง ส่วนพิกัดที่ผิดจังหวัดจริงๆ (เช่นลิงก์เชียงใหม่ แต่เลือกชลบุรี)
+ * จะไม่ผ่านทั้งสองวิธี จึงยังกันได้อยู่
+ */
+export function pointMatchesProvince(code: string, lat: number, lng: number): boolean {
+  if (isPointInProvinceBounds(code, lat, lng)) return true;
+
+  return findNearestProvince(lat, lng)?.code === code;
 }
 
 /**

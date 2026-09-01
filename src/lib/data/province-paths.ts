@@ -10,6 +10,19 @@ export const MAP_VIEWBOX = "0 0 600 1108";
 export const MAP_WIDTH = 600;
 export const MAP_HEIGHT = 1108;
 
+/**
+ * ค่าคงที่ของ Web Mercator ที่ใช้ตอนแปลงขอบเขตจังหวัดเป็น SVG
+ *
+ * ต้อง export ออกมาเพราะการปักหมุดงานต้องแปลง lat/lng ตอนรัน (runtime)
+ * ด้วยสูตรและค่าคงที่ชุดเดียวกันเป๊ะ ไม่งั้นหมุดจะไม่ตรงกับรูปร่างจังหวัด
+ * ใช้คู่กับ projectToMap() ใน src/lib/map-camera.ts
+ */
+export const MAP_PROJECTION = {
+  minX: 0.7704506725027779,
+  minY: 0.44195980818867864,
+  scale: 26110.971842118,
+} as const;
+
 /** รหัส ISO 3166-2 (เช่น 'TH-50') → SVG path — ตรงกับฟิลด์ code ใน provinces.ts */
 export const PROVINCE_PATHS: Record<string, string> = {
   "TH-10": "M257.6 493.8L241.1 496.1L232.5 493.4L227.6 504.7L215.1 504.4L215.3 510.7L221 527.6L224.2 527L229.3 513.9L242 515.5L253.7 512.4L259.4 503.7L257.6 493.8Z",

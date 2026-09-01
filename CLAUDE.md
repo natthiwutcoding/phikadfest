@@ -9,6 +9,9 @@ Next 16 ต่างจากที่โมเดลรู้ — อ่าน 
 - วันเวลา: ใช้ `lib/format.ts` เท่านั้น (ตรึง Asia/Bangkok) ไม่งั้น hydration พัง วันเพี้ยน
 - ข้อมูล: อ่านผ่าน `lib/events.ts` เท่านั้น ห้าม query ใน page
 - `lib/data/sample-events.ts` = งานปลอม ห้ามขึ้น production
+- `npm run seed:demo` ใส่งานตัวอย่างลง DB (`--clean` เพื่อลบ) — dev เท่านั้น
+- ขอบเขตพื้นที่ที่เปิดรับงาน: `lib/region-scope.ts` จุดเดียว (ตอนนี้ภาคตะวันออก) ห้ามพิมพ์ชื่อภาคตายตัวในหน้าเว็บ
+- slug งานเป็นภาษาไทย — อ่านจาก URL ต้องผ่าน `readEventSlugParam()` ไม่งั้น 404
 - `lib/data/provinces.ts` ↔ `supabase/migrations/0002_seed_reference.sql` แก้คู่กันเสมอ
 - `lib/data/province-paths.ts` สร้างด้วย `npm run build:map` ห้ามแก้มือ
 - หน้าแสดงงานต้อง SSR + JSON-LD (`lib/structured-data.ts`) — SEO คือช่องทางโตหลัก

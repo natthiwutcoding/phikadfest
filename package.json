@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:map": "node scripts/build-province-paths.mjs"
+    "build:map": "node scripts/build-province-paths.mjs",
+    "seed:demo": "node scripts/seed-demo-events.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

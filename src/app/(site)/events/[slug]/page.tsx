@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { EventCover } from "@/components/event-cover";
 import { EventMap } from "@/components/event-map";
 import {
   formatAddress,
@@ -11,12 +12,12 @@ import {
   formatTimeRange,
 } from "@/lib/format";
 import { getEventBySlug } from "@/lib/events";
+import { readEventSlugParam } from "@/lib/slug";
 import { buildEventJsonLd } from "@/lib/structured-data";
 
 export async function generateMetadata(props: PageProps<"/events/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
-  // getEventBySlug ถูกห่อด้วย React.cache อยู่แล้ว การเรียกซ้ำใน page จึงไม่ query ใหม่
-  const event = await getEventBySlug(slug);
+  const event = await getEventBySlug(readEventSlugParam(slug));
 
   if (!event) return { title: "ไม่พบงานนี้" };
 
@@ -41,7 +42,7 @@ export async function generateMetadata(props: PageProps<"/events/[slug]">): Prom
 
 export default async function EventDetailPage(props: PageProps<"/events/[slug]">) {
   const { slug } = await props.params;
-  const event = await getEventBySlug(slug);
+  const event = await getEventBySlug(readEventSlugParam(slug));
 
   if (!event) notFound();
 
@@ -64,6 +65,22 @@ export default async function EventDetailPage(props: PageProps<"/events/[slug]">
           ← กลับไปหน้าค้นหางาน
         </Link>
       </nav>
+
+      {/*
+        แสดงรูปปกเฉพาะเมื่อมีรูปจริงเท่านั้น — ไม่ใช้ SVG สำรองเหมือนในการ์ด
+        เพราะบนการ์ด ภาพประกอบช่วยให้สายตาแยกงานแต่ละอันในตารางได้ แต่บนหน้านี้
+        ที่มีงานเดียว ภาพไล่สีขนาดใหญ่แค่ดันเนื้อหาจริงให้ลงไปอยู่ล่างจอโดยไม่ให้ข้อมูลอะไร
+      */}
+      {event.coverImageUrl ? (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-line">
+          <EventCover
+            category={event.category}
+            imageUrl={event.coverImageUrl}
+            // รูปนี้คือ LCP ของหน้า โหลดก่อนเลยไม่ต้องรอ lazy load
+            priority
+          />
+        </div>
+      ) : null}
 
       <header className="mt-4">
         <div className="flex flex-wrap items-center gap-2 text-sm">
