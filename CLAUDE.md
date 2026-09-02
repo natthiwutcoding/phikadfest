@@ -16,8 +16,12 @@ Next 16 ต่างจากที่โมเดลรู้ — อ่าน 
 - `lib/data/province-paths.ts` สร้างด้วย `npm run build:map` ห้ามแก้มือ
 - หน้าแสดงงานต้อง SSR + JSON-LD (`lib/structured-data.ts`) — SEO คือช่องทางโตหลัก
 - `app/(site)/` มี footer · `app/map/` ไม่มี
+- query ซ้ำ: `listEvents`/`getEventBySlug` ห่อ `React.cache` ไว้แล้ว หน้าหนึ่งเรียกกี่ครั้งก็ยิงจริงครั้งเดียว
+  ตัวกรองต้องผ่าน `lib/event-filter-key.ts` เสมอ (React.cache เทียบ argument ด้วย reference)
+- เทสต์อยู่ข้างไฟล์ที่มันทดสอบ (`*.test.ts`) — เฉพาะฟังก์ชันบริสุทธิ์ใน `lib/`
+  ไฟล์ที่ import `server-only` ทดสอบไม่ได้ ถ้าอยากทดสอบต้องแยกตรรกะออกมาก่อน
 
 ## เสร็จเมื่อ
 
-`npx tsc --noEmit && npm run lint && npm run build` ผ่าน
+`npx tsc --noEmit && npm run lint && npm test && npm run build` ผ่าน
 (`PageProps`/`LayoutProps` หาไม่เจอ → `npx next typegen`)

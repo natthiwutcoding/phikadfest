@@ -22,7 +22,13 @@ export const CATEGORIES: Category[] = [
 ];
 
 const BY_SLUG = new Map(CATEGORIES.map((c) => [c.slug, c]));
+const BY_ID = new Map(CATEGORIES.map((c) => [c.id, c]));
 
 export function getCategory(slug: string): Category | undefined {
   return BY_SLUG.get(slug);
+}
+
+/** ค้นหมวดหมู่จาก id — ใช้ตอนแปลงแถวจากฐานข้อมูล ซึ่งเก็บหมวดหมู่เป็น foreign key */
+export function getCategoryById(id: number): Category | undefined {
+  return BY_ID.get(id);
 }

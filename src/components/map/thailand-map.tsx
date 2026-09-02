@@ -17,6 +17,7 @@ import {
 } from "@/lib/data/province-label-offsets";
 import { ClusterPinCard } from "@/components/map/cluster-pin-card";
 import { EventPinCard } from "@/components/map/event-pin-card";
+import { MapZoomControls } from "@/components/map/map-zoom-controls";
 import { PROVINCES } from "@/lib/data/provinces";
 import {
   ACTIVE_PROVINCE_CODES,
@@ -24,7 +25,7 @@ import {
   isProvinceInScope,
 } from "@/lib/region-scope";
 import { MAP_VIEWBOX, PROVINCE_LABEL_ANCHORS, PROVINCE_PATHS } from "@/lib/data/province-paths";
-import type { MapPinEvent, ProvinceEventSummary } from "@/lib/events";
+import type { MapPinEvent, ProvinceEventSummary } from "@/lib/types";
 import {
   cameraFitProvince,
   cameraFitProvinces,
@@ -1147,65 +1148,6 @@ export function ThailandMap({ summary, pinEvents, selectedCode, baseParams }: Pr
         </a>{" "}
         (CC BY 4.0)
       </p>
-    </div>
-  );
-}
-
-/** ปุ่มควบคุมมุมขวา ตามธรรมเนียมแอปแผนที่ทั่วไป */
-function MapZoomControls({
-  onZoomIn,
-  onZoomOut,
-  onWholeRegion,
-  onLocate,
-}: {
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onWholeRegion: () => void;
-  onLocate: () => void;
-}) {
-  const round =
-    "flex size-11 items-center justify-center rounded-xl border border-line bg-surface/90 backdrop-blur transition-colors hover:bg-surface-muted";
-
-  return (
-    <div className="absolute right-3 bottom-8 z-10 flex flex-col gap-2 lg:top-1/2 lg:bottom-auto lg:-translate-y-1/2">
-      <button type="button" onClick={onLocate} aria-label="ไปที่ตำแหน่งของฉัน" className={round}>
-        <span aria-hidden className="text-lg">
-          📍
-        </span>
-      </button>
-
-      <div className="flex flex-col overflow-hidden rounded-xl border border-line backdrop-blur">
-        <button
-          type="button"
-          onClick={onZoomIn}
-          aria-label="ซูมเข้า"
-          className="flex size-11 items-center justify-center bg-surface/90 text-xl transition-colors hover:bg-surface-muted"
-        >
-          <span aria-hidden>+</span>
-        </button>
-        <div className="h-px bg-line" />
-        <button
-          type="button"
-          onClick={onZoomOut}
-          aria-label="ซูมออก"
-          className="flex size-11 items-center justify-center bg-surface/90 text-xl transition-colors hover:bg-surface-muted"
-        >
-          <span aria-hidden>−</span>
-        </button>
-      </div>
-
-      {/*
-        มุมมอง "ถอยสุด" ของเว็บนี้คือทั้งภาค ไม่ใช่ทั้งประเทศ จึงใช้ไอคอนเข็มทิศแทนธงชาติ
-        ธงชาติสื่อว่ากดแล้วจะเห็นทั้งไทย ซึ่งไม่ตรงกับสิ่งที่เกิดขึ้นจริง
-      */}
-      <button
-        type="button"
-        onClick={onWholeRegion}
-        aria-label={`ดูทั้ง${ACTIVE_REGION_LABEL}`}
-        className={round}
-      >
-        <span aria-hidden>🧭</span>
-      </button>
     </div>
   );
 }

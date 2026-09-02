@@ -1,12 +1,23 @@
 import { cache } from "react";
 
-import { CATEGORIES, getCategory } from "@/lib/data/categories";
-import { getProvince, PROVINCES } from "@/lib/data/provinces";
+import {
+  filterKey,
+  normalizeFilters,
+  parseFilterKey,
+  type NormalizedEventFilters,
+} from "@/lib/event-filter-key";
+import { getCategory, getCategoryById } from "@/lib/data/categories";
+import { getProvince, getProvinceById, PROVINCES } from "@/lib/data/provinces";
 import { getSampleEvents } from "@/lib/data/sample-events";
 import { haversineMeters } from "@/lib/geo";
 import { ACTIVE_PROVINCE_IDS, isProvinceInScope } from "@/lib/region-scope";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { EventFilters, EventRecord, EventWithRelations } from "@/lib/types";
+import type {
+  EventFilters,
+  EventWithRelations,
+  MapPinEvent,
+  ProvinceEventSummary,
+} from "@/lib/types";
 
 /**
  * ชั้นเข้าถึงข้อมูลอีเวนต์ (data access layer)
@@ -56,10 +67,6 @@ interface EventRow {
   distance_m?: number;
 }
 
-/** ตารางค้นหาจังหวัด/หมวดหมู่จาก id — สร้างครั้งเดียวตอนโหลดโมดูล */
-const PROVINCE_BY_ID = new Map(PROVINCES.map((province) => [province.id, province]));
-const CATEGORY_BY_ID = new Map(CATEGORIES.map((category) => [category.id, category]));
-
 /** แปลง null ของ SQL เป็น undefined ให้ตรงกับ type ฝั่ง TypeScript */
 const orUndefined = <T,>(value: T | null): T | undefined => value ?? undefined;
 
@@ -74,8 +81,8 @@ const orUndefined = <T,>(value: T | null): T | undefined => value ?? undefined;
  * ดีกว่า throw เพราะข้อมูลหนึ่งแถวเสียไม่ควรทำให้ทั้งหน้าพัง
  */
 function toEvent(row: EventRow): EventWithRelations | null {
-  const province = PROVINCE_BY_ID.get(row.province_id);
-  const category = CATEGORY_BY_ID.get(row.category_id);
+  const province = getProvinceById(row.province_id);
+  const category = getCategoryById(row.category_id);
   if (!province || !category) return null;
 
   return {
@@ -108,6 +115,18 @@ function toEvent(row: EventRow): EventWithRelations | null {
   };
 }
 
+/** นับจำนวนรายการต่อคีย์ — ใช้ร่วมกันทั้งการนับตามหมวดหมู่และตามจังหวัด */
+function countBy<T>(items: T[], keyOf: (item: T) => string): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const item of items) {
+    const key = keyOf(item);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
 // ---------------------------------------------------------------------------
 // โหมดข้อมูลตัวอย่าง (ใช้เมื่อยังไม่ได้ตั้งค่า Supabase)
 // ---------------------------------------------------------------------------
@@ -126,9 +145,9 @@ const loadSampleEvents = cache(async (): Promise<EventWithRelations[]> => {
 /** กรองข้อมูลตัวอย่างด้วย JavaScript — ตรรกะเดียวกับที่ฐานข้อมูลทำให้ในโหมดจริง */
 function filterSampleEvents(
   events: EventWithRelations[],
-  filters: EventFilters,
+  filters: NormalizedEventFilters,
 ): EventWithRelations[] {
-  const { upcomingOnly = true } = filters;
+  const { upcomingOnly } = filters;
 
   // บังคับขอบเขตภาคเหมือนที่ทำกับ query จริง ไม่งั้นโหมดพัฒนาจะให้ผลต่างจากตอน deploy
   let results = events.filter((event) => isProvinceInScope(event.provinceSlug));
@@ -157,22 +176,23 @@ function filterSampleEvents(
   const needle = filters.query?.trim().toLowerCase();
   if (needle) {
     results = results.filter((event) =>
-      [event.title, event.description, event.venueName, event.province.nameTh]
-        .filter(Boolean)
-        .some((field) => field!.toLowerCase().includes(needle)),
+      [event.title, event.description, event.venueName, event.province.nameTh].some((field) =>
+        field?.toLowerCase().includes(needle),
+      ),
     );
   }
 
-  return [...results].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+  // results เป็น array ใหม่จาก .filter() อยู่แล้ว จึงเรียงในที่ได้โดยไม่กระทบข้อมูลต้นทาง
+  return results.sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
 }
 
 // ---------------------------------------------------------------------------
 // API ที่หน้าเว็บเรียกใช้
 // ---------------------------------------------------------------------------
 
-/** ค้นหาอีเวนต์ตามเงื่อนไข เรียงตามวันที่เริ่มจากใกล้ที่สุด */
-export async function listEvents(filters: EventFilters = {}): Promise<EventWithRelations[]> {
-  const { upcomingOnly = true, limit } = filters;
+/** ยิง query จริง — ห้ามเรียกตรงจากภายนอก ให้ผ่าน listEvents() ที่กัน query ซ้ำให้แล้ว */
+async function queryEvents(filters: NormalizedEventFilters): Promise<EventWithRelations[]> {
+  const { upcomingOnly, limit } = filters;
 
   if (USING_SAMPLE_DATA) {
     const results = filterSampleEvents(await loadSampleEvents(), filters);
@@ -187,9 +207,9 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventWithR
     /*
       บังคับขอบเขตภาคทุก query เสมอ — ไม่ใช่ตัวเลือกที่ผู้เรียกจะข้ามได้
 
-      ฟังก์ชันอื่นทั้งหมด (countEventsByCategory, listMapPinEvents,
-      getProvinceEventSummary, listProvincesWithEvents) เรียกผ่าน listEvents ตัวนี้
-      การกรองที่นี่จุดเดียวจึงคุมหน้าแรก หน้าค้นหา หน้าแผนที่ และ sitemap พร้อมกัน
+      ฟังก์ชันอื่นทั้งหมด (listMapPinEvents, getProvinceEventSummary) เรียกผ่าน
+      listEvents ตัวนี้ การกรองที่นี่จุดเดียวจึงคุมหน้าแรก หน้าค้นหา หน้าแผนที่
+      และ sitemap พร้อมกัน
     */
     .in("province_id", ACTIVE_PROVINCE_IDS);
 
@@ -231,16 +251,44 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventWithR
   query = query.order("start_at", { ascending: true });
   if (limit) query = query.limit(limit);
 
-  const { data, error } = await query;
+  const { data, error } = await query.returns<EventRow[]>();
   if (error) {
     console.error("[events] listEvents ล้มเหลว:", error.message);
     return [];
   }
 
-  return (data as unknown as EventRow[]).flatMap((row) => toEvent(row) ?? []);
+  return (data ?? []).flatMap((row) => toEvent(row) ?? []);
 }
 
-export async function getEventBySlug(slug: string): Promise<EventWithRelations | null> {
+/**
+ * รวม query ที่เหมือนกันภายใน request เดียวให้ยิงจริงครั้งเดียว
+ *
+ * จำเป็นเพราะหน้าหนึ่งเรียกข้อมูลชุดเดียวกันหลายทาง เช่นหน้าแผนที่ที่ต้องใช้ทั้ง
+ * สรุปรายจังหวัดและหมุดงาน ซึ่งมาจากรายการงานชุดเดียวกัน
+ *
+ * Next.js รวม `fetch()` ที่ซ้ำกันให้อัตโนมัติ แต่ไม่รวม query ที่ยิงผ่าน Supabase client
+ * จึงต้องห่อเอง (แนวทางเดียวกับที่ `lib/auth.ts` ใช้กับ getCurrentUser)
+ * ขอบเขตของแคชคือหนึ่ง request เท่านั้น ไม่มีการแชร์ข้ามผู้ใช้หรือข้ามการโหลดหน้า
+ *
+ * ตัวกรองเดินทางเข้ามาเป็นคีย์ข้อความ เพราะ React.cache เทียบ argument ด้วย reference
+ * (ดูเหตุผลเต็มใน `lib/event-filter-key.ts`)
+ */
+const cachedListEvents = cache(
+  (key: string): Promise<EventWithRelations[]> => queryEvents(parseFilterKey(key)),
+);
+
+/** ค้นหาอีเวนต์ตามเงื่อนไข เรียงตามวันที่เริ่มจากใกล้ที่สุด */
+export function listEvents(filters: EventFilters = {}): Promise<EventWithRelations[]> {
+  return cachedListEvents(filterKey(filters));
+}
+
+/**
+ * งานหนึ่งรายการจาก slug — คืน null เมื่อไม่พบ
+ *
+ * ห่อด้วย cache เพราะหน้ารายละเอียดงานเรียกสองครั้งต่อการโหลดหนึ่งครั้ง:
+ * ครั้งแรกใน generateMetadata (ทำ <title> กับ OG) และอีกครั้งในตัวหน้าเอง
+ */
+export const getEventBySlug = cache(async (slug: string): Promise<EventWithRelations | null> => {
   if (USING_SAMPLE_DATA) {
     const events = await loadSampleEvents();
     return events.find((event) => event.slug === slug) ?? null;
@@ -252,6 +300,7 @@ export async function getEventBySlug(slug: string): Promise<EventWithRelations |
     .select(EVENT_COLUMNS)
     .eq("status", "approved")
     .eq("slug", slug)
+    .returns<EventRow[]>()
     .maybeSingle();
 
   if (error) {
@@ -259,8 +308,8 @@ export async function getEventBySlug(slug: string): Promise<EventWithRelations |
     return null;
   }
 
-  return data ? toEvent(data as unknown as EventRow) : null;
-}
+  return data ? toEvent(data) : null;
+});
 
 /**
  * งานที่อยู่ใกล้พิกัดที่กำหนด เรียงจากใกล้ไปไกล
@@ -278,10 +327,10 @@ export async function findNearbyEvents(options: {
   const { lat, lng, radiusM = 100_000, limit = 20, categorySlug } = options;
 
   if (USING_SAMPLE_DATA) {
-    const events = filterSampleEvents(await loadSampleEvents(), {
-      categorySlug,
-      upcomingOnly: true,
-    });
+    const events = filterSampleEvents(
+      await loadSampleEvents(),
+      normalizeFilters({ categorySlug, upcomingOnly: true }),
+    );
 
     return events
       .flatMap((event) => {
@@ -294,7 +343,7 @@ export async function findNearbyEvents(options: {
         if (distanceM > radiusM) return [];
         return [{ ...event, distanceM }];
       })
-      .sort((a, b) => a.distanceM! - b.distanceM!)
+      .sort((a, b) => a.distanceM - b.distanceM)
       .slice(0, limit);
   }
 
@@ -318,59 +367,36 @@ export async function findNearbyEvents(options: {
     กรองฝั่ง JS แทนการแก้ SQL เพราะไม่ต้องเพิ่ม migration และแถวที่ RPC คืนมาถูกจำกัดด้วย
     limit อยู่แล้ว (ตั้งต้น 20) การกรองซ้ำจึงไม่มีผลต่อประสิทธิภาพ
   */
-  return (data as EventRow[]).flatMap((row) => {
+  return ((data ?? []) as EventRow[]).flatMap((row) => {
     const event = toEvent(row);
     return event && isProvinceInScope(event.provinceSlug) ? [event] : [];
   });
 }
 
-/** จำนวนงานที่กำลังจะมาถึง แยกตามหมวดหมู่ — ใช้แสดงตัวเลขบนปุ่มกรอง */
-export async function countEventsByCategory(): Promise<Map<string, number>> {
-  const events = await listEvents();
-  const counts = new Map<string, number>();
-
-  for (const event of events) {
-    counts.set(event.categorySlug, (counts.get(event.categorySlug) ?? 0) + 1);
-  }
-
-  return counts;
-}
-
-/** สรุปงานของหนึ่งจังหวัด สำหรับระบายสีและแสดงป้ายบนแผนที่ */
-export interface ProvinceEventSummary {
-  /** ISO 3166-2 เช่น 'TH-50' — ใช้เป็น key เชื่อมกับ PROVINCE_PATHS */
-  code: string;
-  slug: string;
-  nameTh: string;
-  count: number;
-  /** ISO timestamp ของงานที่จะถึงเร็วที่สุดในจังหวัดนี้ */
-  nextEventAt: string;
+/**
+ * จำนวนงานแยกตามหมวดหมู่ — ใช้แสดงตัวเลขบนปุ่มกรองหน้าแรก
+ *
+ * รับรายการงานที่ดึงมาแล้วแทนการดึงเอง เพราะหน้าที่ใช้ตัวเลขนี้แสดงการ์ดงาน
+ * จากชุดข้อมูลเดียวกันอยู่แล้ว — ส่งต่อกันได้เลย ไม่ต้องยิง query เพิ่ม
+ */
+export function countByCategory(events: EventWithRelations[]): Map<string, number> {
+  return countBy(events, (event) => event.categorySlug);
 }
 
 /**
- * สรุปจำนวนงานและวันที่ใกล้ที่สุด แยกตามจังหวัด — ใช้ในหน้าแผนที่
+ * จังหวัดที่มีงาน พร้อมจำนวน เรียงจากมากไปน้อย — ใช้ทำหน้าแรกและ sitemap
  *
- * คืนเฉพาะจังหวัดที่มีงานจริง (ไม่ใช่ครบ 77) เพื่อลดข้อมูลที่ส่งไปเบราว์เซอร์
- * ตัวแผนที่วาดครบทุกจังหวัดอยู่แล้วจาก PROVINCE_PATHS จังหวัดที่ไม่อยู่ในผลลัพธ์นี้
- * จะถูกวาดเป็นสีพื้นว่างเปล่า
+ * รับรายการงานที่ดึงมาแล้วด้วยเหตุผลเดียวกับ countByCategory
  */
-/** งานหนึ่งรายการที่มีพิกัด พอสำหรับปักหมุดและแสดงการ์ดเล็กบนแผนที่ */
-export interface MapPinEvent {
-  id: string;
-  slug: string;
-  title: string;
-  startAt: string;
-  endAt: string;
-  isAllDay: boolean;
-  venueName?: string;
-  isFree: boolean;
-  priceMin?: number;
-  priceMax?: number;
-  lat: number;
-  lng: number;
-  categoryNameTh: string;
-  categoryEmoji: string;
-  categoryColor: string;
+export function provincesWithEvents(
+  events: EventWithRelations[],
+): { slug: string; nameTh: string; count: number }[] {
+  const counts = countBy(events, (event) => event.provinceSlug);
+
+  return PROVINCES.flatMap((province) => {
+    const count = counts.get(province.slug);
+    return count ? [{ slug: province.slug, nameTh: province.nameTh, count }] : [];
+  }).sort((a, b) => b.count - a.count);
 }
 
 /**
@@ -410,6 +436,13 @@ export async function listMapPinEvents(
   });
 }
 
+/**
+ * สรุปจำนวนงานและวันที่ใกล้ที่สุด แยกตามจังหวัด — ใช้ในหน้าแผนที่
+ *
+ * คืนเฉพาะจังหวัดที่มีงานจริง (ไม่ใช่ครบ 77) เพื่อลดข้อมูลที่ส่งไปเบราว์เซอร์
+ * ตัวแผนที่วาดครบทุกจังหวัดอยู่แล้วจาก PROVINCE_PATHS จังหวัดที่ไม่อยู่ในผลลัพธ์นี้
+ * จะถูกวาดเป็นสีพื้นว่างเปล่า
+ */
 export async function getProvinceEventSummary(
   filters: Pick<EventFilters, "from" | "to"> = {},
 ): Promise<ProvinceEventSummary[]> {
@@ -431,37 +464,18 @@ export async function getProvinceEventSummary(
     }
   }
 
-  return PROVINCES.filter((province) => byProvince.has(province.slug)).map((province) => {
-    const summary = byProvince.get(province.slug)!;
-    return {
-      code: province.code,
-      slug: province.slug,
-      nameTh: province.nameTh,
-      count: summary.count,
-      nextEventAt: summary.nextEventAt,
-    };
+  return PROVINCES.flatMap((province) => {
+    const summary = byProvince.get(province.slug);
+    if (!summary) return [];
+
+    return [
+      {
+        code: province.code,
+        slug: province.slug,
+        nameTh: province.nameTh,
+        count: summary.count,
+        nextEventAt: summary.nextEventAt,
+      },
+    ];
   });
 }
-
-/** จังหวัดที่มีงานกำลังจะมาถึง พร้อมจำนวน — ใช้ทำหน้าแรกและ sitemap */
-export async function listProvincesWithEvents(): Promise<
-  { slug: string; nameTh: string; count: number }[]
-> {
-  const events = await listEvents();
-  const counts = new Map<string, number>();
-
-  for (const event of events) {
-    counts.set(event.provinceSlug, (counts.get(event.provinceSlug) ?? 0) + 1);
-  }
-
-  return PROVINCES.filter((province) => counts.has(province.slug))
-    .map((province) => ({
-      slug: province.slug,
-      nameTh: province.nameTh,
-      count: counts.get(province.slug)!,
-    }))
-    .sort((a, b) => b.count - a.count);
-}
-
-export type { EventRecord };
-export { CATEGORIES, PROVINCES };

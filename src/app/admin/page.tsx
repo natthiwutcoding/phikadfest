@@ -4,8 +4,8 @@ import Link from "next/link";
 import { logout } from "@/app/(site)/login/actions";
 import { reviewEvent } from "@/app/admin/actions";
 import { requireAdmin } from "@/lib/auth";
-import { CATEGORIES } from "@/lib/data/categories";
-import { PROVINCES } from "@/lib/data/provinces";
+import { getCategoryById } from "@/lib/data/categories";
+import { getProvinceById } from "@/lib/data/provinces";
 import { formatDateRange } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -28,10 +28,6 @@ interface PendingRow {
   source_url: string | null;
   created_at: string;
 }
-
-// ตารางค้นหาจาก id — ตาราง events เก็บเป็น foreign key ส่วนชื่อที่แสดงอยู่ในค่าคงที่ของแอป
-const PROVINCE_BY_ID = new Map(PROVINCES.map((province) => [province.id, province]));
-const CATEGORY_BY_ID = new Map(CATEGORIES.map((category) => [category.id, category]));
 
 export default async function AdminPage() {
   // เด้งออกทันทีถ้าไม่ใช่แอดมิน — ต้องเรียกก่อนแตะข้อมูลใดๆ
@@ -83,8 +79,9 @@ export default async function AdminPage() {
 
       <ul className="mt-6 space-y-4">
         {pending.map((event) => {
-          const province = PROVINCE_BY_ID.get(event.province_id);
-          const category = CATEGORY_BY_ID.get(event.category_id);
+          // ตาราง events เก็บจังหวัด/หมวดหมู่เป็น foreign key ส่วนชื่อที่แสดงอยู่ในค่าคงที่ของแอป
+          const province = getProvinceById(event.province_id);
+          const category = getCategoryById(event.category_id);
 
           return (
             <li key={event.id} className="rounded-2xl border border-line bg-surface p-4 sm:p-5">

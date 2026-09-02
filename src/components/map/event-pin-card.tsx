@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { formatDateRange, formatPrice, formatRelativeDay, formatTimeRange } from "@/lib/format";
-import type { MapPinEvent } from "@/lib/events";
+import type { MapPinEvent } from "@/lib/types";
 
 /**
  * การ์ดงานเล็กที่ลอยเหนือหมุดบนแผนที่

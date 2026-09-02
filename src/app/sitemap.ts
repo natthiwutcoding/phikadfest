@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { CATEGORIES } from "@/lib/data/categories";
-import { listEvents, listProvincesWithEvents } from "@/lib/events";
+import { listEvents, provincesWithEvents } from "@/lib/events";
 import { absoluteUrl } from "@/lib/site";
 
 /**
@@ -14,7 +14,9 @@ import { absoluteUrl } from "@/lib/site";
  * ถูกมองว่าเป็นเนื้อหาคุณภาพต่ำ และฉุด ranking ของทั้งเว็บ
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [events, provinces] = await Promise.all([listEvents(), listProvincesWithEvents()]);
+  // จังหวัดที่มีงานคำนวณจากรายการเดียวกับที่ใช้ทำหน้างาน — ไม่ต้องยิง query ซ้ำ
+  const events = await listEvents();
+  const provinces = provincesWithEvents(events);
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: absoluteUrl("/"), changeFrequency: "daily", priority: 1 },

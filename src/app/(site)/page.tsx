@@ -4,15 +4,25 @@ import { EventCard } from "@/components/event-card";
 import { HeroGlow } from "@/components/hero-glow";
 import { NearbyEvents } from "@/components/nearby-events";
 import { CATEGORIES } from "@/lib/data/categories";
-import { countEventsByCategory, listEvents, listProvincesWithEvents } from "@/lib/events";
+import { countByCategory, listEvents, provincesWithEvents } from "@/lib/events";
 import { ACTIVE_PROVINCES, ACTIVE_REGION_LABEL } from "@/lib/region-scope";
 
+/** จำนวนการ์ดงานในส่วน "งานที่กำลังจะถึง" — พอดีสองแถวบนจอเดสก์ท็อป */
+const UPCOMING_LIMIT = 6;
+
 export default async function HomePage() {
-  const [upcoming, categoryCounts, provinces] = await Promise.all([
-    listEvents({ limit: 6 }),
-    countEventsByCategory(),
-    listProvincesWithEvents(),
-  ]);
+  /*
+    ดึงงานทั้งหมดครั้งเดียวแล้วคำนวณต่อในหน่วยความจำ
+
+    ทั้งสามส่วนของหน้านี้ (การ์ดงาน ตัวเลขบนปุ่มหมวดหมู่ และรายชื่อจังหวัด)
+    มาจากรายการงานชุดเดียวกัน — เดิมแยกกันเรียกจึงยิงฐานข้อมูลสามครั้งด้วยเงื่อนไขเดียวกัน
+    ส่วนการนับก็ต้องอ่านทุกแถวอยู่แล้ว การใส่ limit ที่ query จึงไม่ได้ช่วยอะไร
+  */
+  const events = await listEvents();
+
+  const upcoming = events.slice(0, UPCOMING_LIMIT);
+  const categoryCounts = countByCategory(events);
+  const provinces = provincesWithEvents(events);
 
   const activeCategories = CATEGORIES.filter((category) => categoryCounts.has(category.slug));
 

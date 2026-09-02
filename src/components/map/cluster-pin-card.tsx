@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { formatDateRange, formatTimeRange } from "@/lib/format";
-import type { MapPinEvent } from "@/lib/events";
+import type { MapPinEvent } from "@/lib/types";
 
 /**
  * รายการงานของกลุ่มหมุดที่ซูมแล้วยังแยกไม่ออก

@@ -75,6 +75,41 @@ export interface EventWithRelations extends EventRecord {
   distanceM?: number;
 }
 
+/**
+ * งานหนึ่งรายการที่มีพิกัด พอสำหรับปักหมุดและแสดงการ์ดเล็กบนแผนที่
+ *
+ * ตัดฟิลด์ที่แผนที่ไม่ได้ใช้ออก (คำอธิบาย ที่อยู่ ลิงก์บัตร ฯลฯ) เพราะข้อมูลชุดนี้
+ * ถูกส่งข้ามไปฝั่งเบราว์เซอร์ทั้งก้อนเพื่อวาดหมุด — ยิ่งเบายิ่งดีต่อเวลาโหลดหน้าแผนที่
+ */
+export interface MapPinEvent {
+  id: string;
+  slug: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  isAllDay: boolean;
+  venueName?: string;
+  isFree: boolean;
+  priceMin?: number;
+  priceMax?: number;
+  lat: number;
+  lng: number;
+  categoryNameTh: string;
+  categoryEmoji: string;
+  categoryColor: string;
+}
+
+/** สรุปงานของหนึ่งจังหวัด สำหรับระบายสีและแสดงป้ายบนแผนที่ */
+export interface ProvinceEventSummary {
+  /** ISO 3166-2 เช่น 'TH-50' — ใช้เป็น key เชื่อมกับ PROVINCE_PATHS */
+  code: string;
+  slug: string;
+  nameTh: string;
+  count: number;
+  /** ISO timestamp ของงานที่จะถึงเร็วที่สุดในจังหวัดนี้ */
+  nextEventAt: string;
+}
+
 export interface EventFilters {
   provinceSlug?: string;
   categorySlug?: string;

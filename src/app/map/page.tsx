@@ -8,6 +8,7 @@ import { getProvince } from "@/lib/data/provinces";
 import { parseDateRange, resolveDateRange } from "@/lib/date-range";
 import { getProvinceEventSummary, listEvents, listMapPinEvents } from "@/lib/events";
 import { ACTIVE_REGION_LABEL } from "@/lib/region-scope";
+import { readParam } from "@/lib/search-params";
 
 const PANEL_EVENT_LIMIT = 5;
 
@@ -17,16 +18,11 @@ export const metadata: Metadata = {
   alternates: { canonical: "/map" },
 };
 
-function one(value: string | string[] | undefined): string | undefined {
-  const single = Array.isArray(value) ? value[0] : value;
-  return single?.trim() || undefined;
-}
-
 export default async function MapPage(props: PageProps<"/map">) {
   const params = await props.searchParams;
 
-  const range = parseDateRange(one(params.range));
-  const provinceSlug = one(params.province);
+  const range = parseDateRange(readParam(params.range));
+  const provinceSlug = readParam(params.province);
   const province = provinceSlug ? getProvince(provinceSlug) : undefined;
 
   const dateRange = resolveDateRange(range);

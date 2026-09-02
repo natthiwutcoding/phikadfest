@@ -1,4 +1,4 @@
-import type { MapPinEvent } from "@/lib/events";
+import type { MapPinEvent } from "@/lib/types";
 
 /**
  * จัดกลุ่มหมุดที่อยู่ใกล้กันบนจอ

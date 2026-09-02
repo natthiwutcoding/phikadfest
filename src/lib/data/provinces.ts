@@ -125,9 +125,20 @@ export const PROVINCES: Province[] = ROWS.map(
 );
 
 const BY_SLUG = new Map(PROVINCES.map((p) => [p.slug, p]));
+const BY_ID = new Map(PROVINCES.map((p) => [p.id, p]));
 
 export function getProvince(slug: string): Province | undefined {
   return BY_SLUG.get(slug);
+}
+
+/**
+ * ค้นจังหวัดจาก id — ใช้ตอนแปลงแถวจากฐานข้อมูล ซึ่งเก็บจังหวัดเป็น foreign key
+ *
+ * อยู่ที่นี่คู่กับ getProvince() แทนที่จะให้แต่ละไฟล์สร้าง Map ของตัวเอง
+ * (เดิม lib/events.ts กับ app/admin/page.tsx ต่างสร้างตารางเดียวกันคนละอัน)
+ */
+export function getProvinceById(id: number): Province | undefined {
+  return BY_ID.get(id);
 }
 
 /** ชื่อภาคที่แสดงบนหน้าเว็บ — `region-scope.ts` ใช้ตั้งชื่อขอบเขตที่เปิดรับงานอยู่ */

@@ -7,20 +7,15 @@ import { getCategory } from "@/lib/data/categories";
 import { getProvince } from "@/lib/data/provinces";
 import { listEvents } from "@/lib/events";
 import { ACTIVE_REGION_LABEL } from "@/lib/region-scope";
-
-/** searchParams ให้ค่ามาเป็น string | string[] เสมอ — หน้านี้สนใจแค่ค่าเดียว */
-function one(value: string | string[] | undefined): string | undefined {
-  const single = Array.isArray(value) ? value[0] : value;
-  return single?.trim() || undefined;
-}
+import { readParam } from "@/lib/search-params";
 
 function readFilters(params: Record<string, string | string[] | undefined>): FilterValues {
   return {
-    province: one(params.province),
-    category: one(params.category),
-    from: one(params.from),
-    to: one(params.to),
-    q: one(params.q),
+    province: readParam(params.province),
+    category: readParam(params.category),
+    from: readParam(params.from),
+    to: readParam(params.to),
+    q: readParam(params.q),
   };
 }
 
