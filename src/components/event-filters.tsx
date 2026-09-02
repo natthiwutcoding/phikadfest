@@ -11,6 +11,7 @@ import {
   type FormEvent,
 } from "react";
 
+import { DateRangePicker } from "@/components/date-range-picker";
 import { CATEGORIES } from "@/lib/data/categories";
 import { ACTIVE_PROVINCES } from "@/lib/region-scope";
 
@@ -76,13 +77,25 @@ export function EventFilters({ values }: { values: FilterValues }) {
 
   useEffect(() => () => clearTimeout(debounceRef.current), []);
 
-  function navigate() {
+  /**
+   * @param overrides ค่าที่เพิ่งเลือกและยังไม่ทันสะท้อนลง DOM
+   *
+   * จำเป็นสำหรับปฏิทินช่วงวันที่ ซึ่งเก็บค่าไว้ใน hidden input ที่ผูกกับ state —
+   * React ยังไม่ commit ตอนที่ navigate() ทำงาน ถ้าอ่านจาก FormData อย่างเดียว
+   * จะได้ค่าเก่าไปหนึ่งจังหวะ (บั๊กจังหวะแบบเดียวกับที่เคยเจอในช่องค้นหาข้อความ)
+   */
+  function navigate(overrides?: Record<string, string | undefined>) {
     const form = formRef.current;
     if (!form) return;
 
     const params = new URLSearchParams();
     for (const [key, value] of new FormData(form).entries()) {
       if (typeof value === "string" && value.trim()) params.set(key, value.trim());
+    }
+
+    for (const [key, value] of Object.entries(overrides ?? {})) {
+      if (value) params.set(key, value);
+      else params.delete(key);
     }
 
     // จำค่าที่ส่งไป เพื่อให้ตอน URL เปลี่ยนกลับมา รู้ว่าเป็นผลจากการพิมพ์ของผู้ใช้เอง ไม่ใช่จากภายนอก
@@ -188,27 +201,20 @@ export function EventFilters({ values }: { values: FilterValues }) {
           </select>
         </label>
 
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <label className="block">
-            <span className="font-medium">ตั้งแต่</span>
-            <input
-              type="date"
-              name="from"
-              defaultValue={values.from ?? ""}
-              onChange={handleFieldChange}
-              className="mt-1 min-h-11 w-full rounded-lg border border-line bg-background px-2 py-2 outline-none focus:border-brand-500"
-            />
-          </label>
-          <label className="block">
-            <span className="font-medium">ถึง</span>
-            <input
-              type="date"
-              name="to"
-              defaultValue={values.to ?? ""}
-              onChange={handleFieldChange}
-              className="mt-1 min-h-11 w-full rounded-lg border border-line bg-background px-2 py-2 outline-none focus:border-brand-500"
-            />
-          </label>
+        <div className="block text-sm">
+          <span className="font-medium">ช่วงวันที่</span>
+          {/*
+            hidden input ทำให้ FormData ยังอ่านค่าได้เหมือนตอนเป็น <input type="date">
+            navigate() จึงไม่ต้องรู้จักปฏิทินเป็นกรณีพิเศษ นอกจากตอนที่ค่าเพิ่งเปลี่ยน
+          */}
+          <input type="hidden" name="from" value={values.from ?? ""} readOnly />
+          <input type="hidden" name="to" value={values.to ?? ""} readOnly />
+
+          <DateRangePicker
+            from={values.from}
+            to={values.to}
+            onChange={(from, to) => navigate({ from, to })}
+          />
         </div>
       </div>
 

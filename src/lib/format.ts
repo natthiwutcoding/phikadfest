@@ -158,3 +158,51 @@ export function formatDistance(meters: number): string {
   const km = meters / 1000;
   return km < 10 ? `${km.toFixed(1)} กม.` : `${Math.round(km)} กม.`;
 }
+
+// ---------------------------------------------------------------------------
+// สำหรับปฏิทินเลือกช่วงวันที่ (components/date-range-picker.tsx)
+//
+// ฟังก์ชันกลุ่มนี้รับวันแบบ 'YYYY-MM-DD' ไม่ใช่ ISO timestamp เต็ม เพราะปฏิทินทำงาน
+// กับ "วันตามปฏิทิน" ล้วนๆ ไม่เกี่ยวกับเวลา การแปลงเป็น Date จึงตรึงเป็นเที่ยงวัน UTC
+// ซึ่งปลอดภัยจากการคลาดวันไม่ว่าเครื่องผู้ใช้จะอยู่เขตเวลาไหน
+// ---------------------------------------------------------------------------
+
+const monthYearFmt = new Intl.DateTimeFormat("th-TH", {
+  timeZone: TZ,
+  month: "long",
+  year: "numeric",
+});
+
+/** แปลง 'YYYY-MM-DD' เป็น Date ที่ตรึงไว้เที่ยงวัน UTC — กันวันคลาดจากการชดเชยเขตเวลา */
+function dayToDate(day: string): Date {
+  return new Date(`${day}T12:00:00Z`);
+}
+
+/** หัวปฏิทิน เช่น 'กันยายน 2569' — ปีเป็น พ.ศ. อัตโนมัติจาก th-TH */
+export function formatMonthYear(year: number, monthIndex: number): string {
+  return monthYearFmt.format(new Date(Date.UTC(year, monthIndex, 15, 12)));
+}
+
+/** วันเดียว เช่น '3 ก.ย. 2569' */
+export function formatDay(day: string): string {
+  return dayMonthYearFmt.format(dayToDate(day));
+}
+
+/**
+ * ข้อความช่วงวันสำหรับปุ่มเปิดปฏิทิน
+ *
+ * รองรับกรณีที่ผู้ใช้ระบุมาไม่ครบคู่ด้วย เพราะ from/to มาจาก URL ที่แก้เองได้
+ * และตัวกรองก็อนุญาตให้ระบุแค่ด้านเดียวอยู่แล้ว (เช่น 'ตั้งแต่ 3 ก.ย. เป็นต้นไป')
+ */
+export function formatDayRange(from?: string, to?: string): string | null {
+  if (!from && !to) return null;
+  if (from && !to) return `ตั้งแต่ ${formatDay(from)}`;
+  if (!from && to) return `ถึง ${formatDay(to!)}`;
+  if (from === to) return formatDay(from!);
+
+  // อยู่เดือนเดียวกัน จึงไม่ต้องเขียนเดือนซ้ำสองครั้ง — '3 – 10 ก.ย. 2569'
+  const sameMonth = from!.slice(0, 7) === to!.slice(0, 7);
+  const startText = sameMonth ? dayFmt.format(dayToDate(from!)) : dayMonthFmt.format(dayToDate(from!));
+
+  return `${startText} – ${formatDay(to!)}`;
+}
