@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useRef, useState, useTransition } from "react";
 
-import { PROVINCES } from "@/lib/data/provinces";
+import { ACTIVE_PROVINCES } from "@/lib/region-scope";
 import type { Province } from "@/lib/types";
 
 /** แสดงผลลัพธ์มากกว่านี้แล้วรายการจะยาวจนบังแผนที่ */
@@ -33,7 +33,8 @@ export function ProvinceSearch({ baseParams }: Props) {
     const needle = query.trim().toLowerCase();
     if (!needle) return [];
 
-    return PROVINCES.filter(
+    // ค้นเฉพาะจังหวัดในภาคที่เปิดรับงาน ไม่งั้นค้นเจอจังหวัดที่กดไปแล้วไม่มีงานให้ดูเลย
+    return ACTIVE_PROVINCES.filter(
       (province) =>
         province.nameTh.includes(needle) || province.nameEn.toLowerCase().includes(needle),
     ).slice(0, MAX_RESULTS);

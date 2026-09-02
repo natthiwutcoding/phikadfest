@@ -78,7 +78,10 @@ export interface EventWithRelations extends EventRecord {
 export interface EventFilters {
   provinceSlug?: string;
   categorySlug?: string;
-  region?: Region;
+  /*
+    ตั้งใจไม่มี region ให้เลือก — ขอบเขตภาคถูกบังคับตายตัวจาก lib/region-scope.ts
+    ที่ listEvents() แล้ว การมีพารามิเตอร์ที่ไม่มีผลไว้จะทำให้เข้าใจผิดว่ายังเลือกภาคได้
+  */
   /** ISO date 'YYYY-MM-DD' */
   from?: string;
   to?: string;

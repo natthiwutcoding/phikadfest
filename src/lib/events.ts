@@ -4,6 +4,7 @@ import { CATEGORIES, getCategory } from "@/lib/data/categories";
 import { getProvince, PROVINCES } from "@/lib/data/provinces";
 import { getSampleEvents } from "@/lib/data/sample-events";
 import { haversineMeters } from "@/lib/geo";
+import { ACTIVE_PROVINCE_IDS, isProvinceInScope } from "@/lib/region-scope";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { EventFilters, EventRecord, EventWithRelations } from "@/lib/types";
 
@@ -128,7 +129,9 @@ function filterSampleEvents(
   filters: EventFilters,
 ): EventWithRelations[] {
   const { upcomingOnly = true } = filters;
-  let results = events;
+
+  // บังคับขอบเขตภาคเหมือนที่ทำกับ query จริง ไม่งั้นโหมดพัฒนาจะให้ผลต่างจากตอน deploy
+  let results = events.filter((event) => isProvinceInScope(event.provinceSlug));
 
   if (upcomingOnly) {
     const now = Date.now();
@@ -138,9 +141,6 @@ function filterSampleEvents(
 
   if (filters.provinceSlug) {
     results = results.filter((event) => event.provinceSlug === filters.provinceSlug);
-  }
-  if (filters.region) {
-    results = results.filter((event) => event.province.region === filters.region);
   }
   if (filters.categorySlug) {
     results = results.filter((event) => event.categorySlug === filters.categorySlug);
@@ -180,7 +180,18 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventWithR
   }
 
   const supabase = await createSupabaseServerClient();
-  let query = supabase.from("events").select(EVENT_COLUMNS).eq("status", "approved");
+  let query = supabase
+    .from("events")
+    .select(EVENT_COLUMNS)
+    .eq("status", "approved")
+    /*
+      บังคับขอบเขตภาคทุก query เสมอ — ไม่ใช่ตัวเลือกที่ผู้เรียกจะข้ามได้
+
+      ฟังก์ชันอื่นทั้งหมด (countEventsByCategory, listMapPinEvents,
+      getProvinceEventSummary, listProvincesWithEvents) เรียกผ่าน listEvents ตัวนี้
+      การกรองที่นี่จุดเดียวจึงคุมหน้าแรก หน้าค้นหา หน้าแผนที่ และ sitemap พร้อมกัน
+    */
+    .in("province_id", ACTIVE_PROVINCE_IDS);
 
   if (upcomingOnly) {
     query = query.gte("end_at", new Date().toISOString());
@@ -189,7 +200,8 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventWithR
   // แปลง slug เป็น id ก่อนกรอง เพราะตาราง events เก็บเป็น foreign key ไม่ใช่ slug
   if (filters.provinceSlug) {
     const province = getProvince(filters.provinceSlug);
-    if (!province) return [];
+    // จังหวัดนอกภาคที่เปิดรับ — คืนว่างทันที กันคนแก้ URL เองให้ชี้ไปจังหวัดที่เราไม่ได้เปิดรับ
+    if (!province || !isProvinceInScope(province.slug)) return [];
     query = query.eq("province_id", province.id);
   }
 
@@ -197,11 +209,6 @@ export async function listEvents(filters: EventFilters = {}): Promise<EventWithR
     const category = getCategory(filters.categorySlug);
     if (!category) return [];
     query = query.eq("category_id", category.id);
-  }
-
-  if (filters.region) {
-    const ids = PROVINCES.filter((p) => p.region === filters.region).map((p) => p.id);
-    query = query.in("province_id", ids);
   }
 
   if (filters.from) {
@@ -305,7 +312,16 @@ export async function findNearbyEvents(options: {
     return [];
   }
 
-  return (data as EventRow[]).flatMap((row) => toEvent(row) ?? []);
+  /*
+    ฟังก์ชันนี้เรียก RPC ตรงๆ จึงไม่ได้ตัวกรองภาคที่บังคับไว้ใน listEvents ต้องกรองเองที่นี่
+
+    กรองฝั่ง JS แทนการแก้ SQL เพราะไม่ต้องเพิ่ม migration และแถวที่ RPC คืนมาถูกจำกัดด้วย
+    limit อยู่แล้ว (ตั้งต้น 20) การกรองซ้ำจึงไม่มีผลต่อประสิทธิภาพ
+  */
+  return (data as EventRow[]).flatMap((row) => {
+    const event = toEvent(row);
+    return event && isProvinceInScope(event.provinceSlug) ? [event] : [];
+  });
 }
 
 /** จำนวนงานที่กำลังจะมาถึง แยกตามหมวดหมู่ — ใช้แสดงตัวเลขบนปุ่มกรอง */

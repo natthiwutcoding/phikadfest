@@ -186,15 +186,15 @@ function regionCamera(viewport: Viewport): Camera {
  * จังหวัดที่จำไว้ถูกนำมาใช้ใน useEffect หลัง mount แทน ซึ่งเป็นที่ที่ถูกต้องสำหรับ
  * ข้อมูลที่มีเฉพาะฝั่งเบราว์เซอร์
  */
-function initialCamera(selectedCode: string | undefined): Camera {
+function initialCamera(selectedCode: string | undefined, viewport: Viewport): Camera {
   // มาจากลิงก์ที่ระบุจังหวัดอยู่แล้ว (เช่นแชร์ลิงก์มา) ให้ซูมไปจังหวัดนั้นเลย
   // ค่านี้มาจาก URL ซึ่งเซิร์ฟเวอร์กับเบราว์เซอร์เห็นตรงกัน จึงใช้ตอน render แรกได้
   if (selectedCode) {
-    const fitted = cameraFitProvince(selectedCode, FALLBACK_VIEWPORT);
+    const fitted = cameraFitProvince(selectedCode, viewport);
     if (fitted) return fitted;
   }
 
-  return regionCamera(FALLBACK_VIEWPORT);
+  return regionCamera(viewport);
 }
 
 export function ThailandMap({ summary, pinEvents, selectedCode, baseParams }: Props) {
@@ -202,7 +202,9 @@ export function ThailandMap({ summary, pinEvents, selectedCode, baseParams }: Pr
   const [, startTransition] = useTransition();
 
   const svgRef = useRef<SVGSVGElement>(null);
-  const [camera, setCamera] = useState<Camera>(() => initialCamera(selectedCode));
+  const [camera, setCamera] = useState<Camera>(() =>
+    initialCamera(selectedCode, FALLBACK_VIEWPORT),
+  );
   const [viewport, setViewport] = useState<Viewport>(FALLBACK_VIEWPORT);
   const [zoomFeel, setZoomFeel] = useState<ZoomFeel>("smooth");
 
@@ -242,6 +244,14 @@ export function ThailandMap({ summary, pinEvents, selectedCode, baseParams }: Pr
   } | null>(null);
 
 
+  /**
+   * true เมื่อจัดกรอบภาพด้วยขนาดจอจริงไปแล้วหนึ่งครั้ง
+   *
+   * ต้องมีเพราะ ResizeObserver เรียก measure() ซ้ำทุกครั้งที่ผู้ใช้หมุนจอหรือย่อ-ขยายหน้าต่าง
+   * ถ้าไม่กันไว้ กล้องจะเด้งกลับไปมุมมองทั้งภาคทุกครั้ง ล้างการซูม/ลากที่ผู้ใช้เพิ่งทำทิ้ง
+   */
+  const initialFitRef = useRef(false);
+
   /** วัดขนาดกรอบจริง แล้วตามดูตอนหน้าต่างเปลี่ยนขนาด */
   useLayoutEffect(() => {
     const element = svgRef.current;
@@ -253,6 +263,24 @@ export function ThailandMap({ summary, pinEvents, selectedCode, baseParams }: Pr
         const next = { width: rect.width, height: rect.height };
         viewportRef.current = next;
         setViewport(next);
+
+        /*
+          จัดกรอบภาพใหม่ด้วยขนาดจอจริง — ครั้งแรกที่วัดได้เท่านั้น
+
+          ⚠️ ขาดขั้นตอนนี้ไปแล้วแผนที่จะเปิดมาเห็นทั้งประเทศบนจอเดสก์ท็อป
+          กล้องตั้งต้นคำนวณจาก FALLBACK_VIEWPORT (390×700) เพราะฝั่งเซิร์ฟเวอร์ไม่มี DOM ให้วัด
+          จอแคบขนาดนั้นต้องใช้ visibleHeight ราว 316 หน่วยจึงจะใส่ภาคตะวันออก (กว้าง 151 หน่วย)
+          ได้พอดี แต่พอเอาค่าเดียวกันไปใช้กับจอกว้าง 1440×742 จะเห็นแผนที่กว้างถึง
+          316 × (1440/742) ≈ 612 หน่วย ซึ่งกว้างกว่าประเทศไทยทั้งอัน (600 หน่วย)
+
+          ทำใน useLayoutEffect จึงเกิดก่อนเบราว์เซอร์วาดภาพ ผู้ใช้ไม่เห็นแผนที่กระพริบ
+          จากมุมมองทั้งประเทศมาเป็นภาค
+        */
+        if (!initialFitRef.current) {
+          initialFitRef.current = true;
+          setZoomFeel("none");
+          setCamera(initialCamera(selectedCode, next));
+        }
       }
     };
 
@@ -261,6 +289,13 @@ export function ThailandMap({ summary, pinEvents, selectedCode, baseParams }: Pr
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
+    /*
+      ตั้งใจไม่ใส่ selectedCode ใน dependency — การจัดกรอบภาพครั้งแรกเกิดตอน mount เท่านั้น
+      จึงต้องการค่า ณ ตอนนั้น ถ้าใส่เข้าไป effect จะถอด-ใส่ ResizeObserver ใหม่ทุกครั้งที่
+      ผู้ใช้เปลี่ยนจังหวัดโดยไม่ได้ประโยชน์อะไร
+      การเปลี่ยนจังหวัดหลังจากนั้นมี syncedCode ด้านล่างจัดการเลื่อนกล้องให้อยู่แล้ว
+    */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**

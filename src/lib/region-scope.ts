@@ -27,6 +27,9 @@ export const ACTIVE_PROVINCES = PROVINCES.filter(
 /** รหัส ISO ของจังหวัดในขอบเขต — ใช้คำนวณกรอบแผนที่ใน map-camera.ts */
 export const ACTIVE_PROVINCE_CODES = ACTIVE_PROVINCES.map((province) => province.code);
 
+/** id ของจังหวัดในขอบเขต — ใช้กรอง query ใน lib/events.ts เพราะตาราง events เก็บเป็น foreign key */
+export const ACTIVE_PROVINCE_IDS = ACTIVE_PROVINCES.map((province) => province.id);
+
 const ACTIVE_PROVINCE_SLUGS = new Set(ACTIVE_PROVINCES.map((province) => province.slug));
 
 /** true เมื่อจังหวัด (ระบุด้วย slug) อยู่ในขอบเขตที่เปิดรับงานอยู่ตอนนี้ */
