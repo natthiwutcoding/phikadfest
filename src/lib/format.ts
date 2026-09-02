@@ -111,8 +111,14 @@ export function formatRelativeDay(startAt: string, endAt: string, now: Date = ne
   const startDay = bangkokDay(startAt);
   const endDay = bangkokDay(endAt);
 
-  // งานหลายวันที่เริ่มไปแล้วแต่ยังไม่จบ
-  if (startDay <= today && today <= endDay) return "กำลังจัดอยู่";
+  /*
+    งานหลายวันที่เริ่มไปแล้วแต่ยังไม่จบ
+
+    ต้องเทียบด้วย `<` ไม่ใช่ `<=` — งานที่เริ่มวันนี้ยังไม่ได้ "กำลังจัด" ตอนเช้า
+    ถ้าใช้ `<=` เงื่อนไขนี้จะกลืนงานที่เริ่มวันนี้ไปทั้งหมด ทำให้บรรทัด "วันนี้" ข้างล่าง
+    ไม่มีวันทำงาน และการ์ดของงานที่จัดเย็นนี้จะขึ้นว่ากำลังจัดอยู่ตั้งแต่เช้า
+  */
+  if (startDay < today && today <= endDay) return "กำลังจัดอยู่";
 
   const diff = daysBetween(today, startDay);
   if (diff < 0) return null;
@@ -125,14 +131,18 @@ export function formatRelativeDay(startAt: string, endAt: string, now: Date = ne
 /** ราคาบัตร เช่น 'เข้าฟรี' / '350 บาท' / '350 – 1,200 บาท' */
 export function formatPrice(isFree: boolean, priceMin?: number, priceMax?: number): string {
   if (isFree) return "เข้าฟรี";
-  if (priceMin == null && priceMax == null) return "ตรวจสอบกับผู้จัด";
 
   const baht = (n: number) => n.toLocaleString("th-TH");
 
   if (priceMin != null && priceMax != null && priceMin !== priceMax) {
     return `${baht(priceMin)} – ${baht(priceMax)} บาท`;
   }
-  return `${baht(priceMin ?? priceMax!)} บาท`;
+
+  // เหลือราคาเดียว (หรือช่วงที่ต่ำสุดเท่าสูงสุด) — แยกตัวแปรไว้ให้ TypeScript ตัด null เอง
+  const single = priceMin ?? priceMax;
+  if (single == null) return "ตรวจสอบกับผู้จัด";
+
+  return `${baht(single)} บาท`;
 }
 
 /**
@@ -151,7 +161,7 @@ export function formatAddress(address: string | undefined, provinceNameTh: strin
   return address.includes(provinceNameTh) ? address : `${address} ${label}`;
 }
 
-/** ระยะทาง เช่น '850 ม.' / '12.4 กม.' / '133 กม.' */
+/** ระยะทาง เช่น '850 ม.' / '8.4 กม.' / '133 กม.' — เกิน 10 กม. ปัดเป็นจำนวนเต็ม */
 export function formatDistance(meters: number): string {
   if (meters < 1000) return `${Math.round(meters)} ม.`;
 
@@ -195,14 +205,16 @@ export function formatDay(day: string): string {
  * และตัวกรองก็อนุญาตให้ระบุแค่ด้านเดียวอยู่แล้ว (เช่น 'ตั้งแต่ 3 ก.ย. เป็นต้นไป')
  */
 export function formatDayRange(from?: string, to?: string): string | null {
-  if (!from && !to) return null;
-  if (from && !to) return `ตั้งแต่ ${formatDay(from)}`;
-  if (!from && to) return `ถึง ${formatDay(to!)}`;
-  if (from === to) return formatDay(from!);
+  // เรียงเงื่อนไขให้ TypeScript ตัดความเป็นไปได้ทีละชั้น จะได้ไม่ต้องเติม `!` ท้ายบรรทัดล่างๆ
+  if (!from) return to ? `ถึง ${formatDay(to)}` : null;
+  if (!to) return `ตั้งแต่ ${formatDay(from)}`;
+  if (from === to) return formatDay(from);
 
   // อยู่เดือนเดียวกัน จึงไม่ต้องเขียนเดือนซ้ำสองครั้ง — '3 – 10 ก.ย. 2569'
-  const sameMonth = from!.slice(0, 7) === to!.slice(0, 7);
-  const startText = sameMonth ? dayFmt.format(dayToDate(from!)) : dayMonthFmt.format(dayToDate(from!));
+  const sameMonth = from.slice(0, 7) === to.slice(0, 7);
+  const startText = sameMonth
+    ? dayFmt.format(dayToDate(from))
+    : dayMonthFmt.format(dayToDate(from));
 
-  return `${startText} – ${formatDay(to!)}`;
+  return `${startText} – ${formatDay(to)}`;
 }
