@@ -8,6 +8,7 @@ import { SubmitSuccessDialog } from "@/components/submit-success-dialog";
 import { INITIAL_SUBMIT_STATE } from "@/lib/form-state";
 import { CATEGORIES } from "@/lib/data/categories";
 import { ACTIVE_PROVINCES, ACTIVE_REGION_LABEL } from "@/lib/region-scope";
+import type { SubmitField } from "@/lib/submit-validation";
 
 // min-h-11 (44px) คือความสูงขั้นต่ำที่กดง่ายด้วยนิ้วบนจอมือถือ ตามมาตรฐาน Apple/Google
 const fieldClass =
@@ -29,7 +30,7 @@ function FieldError({ message }: { message?: string }) {
  * actions.ts ตรวจ coverImage ก่อน title ถ้าเรียงตามนั้น ผู้ใช้ที่ผิดทั้งชื่องานและไฟล์รูป
  * จะถูกพาไปช่องรูปซึ่งอยู่เกือบล่างสุด แล้วต้องเลื่อนขึ้นไปหาช่องชื่องานเองอยู่ดี
  */
-const FIELD_ORDER = [
+const FIELD_ORDER: readonly SubmitField[] = [
   "title",
   "description",
   "category",

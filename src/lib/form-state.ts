@@ -1,3 +1,5 @@
+import type { SubmitErrors } from "@/lib/submit-validation";
+
 /**
  * สถานะของฟอร์มที่ใช้กับ useActionState
  *
@@ -8,8 +10,13 @@
 export interface SubmitState {
   status: "idle" | "success" | "error";
   message?: string;
-  /** ข้อความ error รายช่อง key คือ name ของ input */
-  errors?: Record<string, string>;
+  /**
+   * ข้อความ error รายช่อง key คือ name ของ input
+   *
+   * เป็น union ของชื่อช่องจริง ไม่ใช่ string ทั่วไป — คำสะกดผิดอย่าง `errors.tittle`
+   * จึงพังตั้งแต่ตอน build แทนที่จะกลายเป็น error ที่ไม่มีวันแสดงบนหน้าจอ
+   */
+  errors?: SubmitErrors;
 }
 
 export const INITIAL_SUBMIT_STATE: SubmitState = { status: "idle" };
