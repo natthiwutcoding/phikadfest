@@ -99,6 +99,19 @@ export interface MapPinEvent {
   categoryColor: string;
 }
 
+/**
+ * งานในมุมมองของแอดมิน — เพิ่มฟิลด์ที่หน้าสาธารณะไม่ได้ใช้
+ *
+ * ต่างจาก EventWithRelations ตรงที่ `status` เป็นสถานะจริงจากฐานข้อมูล ไม่ใช่ 'approved'
+ * ตายตัว เพราะหน้าแอดมินต้องเห็นงานทุกสถานะรวมถึงที่ยังไม่อนุมัติ
+ */
+export interface AdminEvent extends EventWithRelations {
+  /** ช่องทางติดต่อผู้จัด — ไม่แสดงบนหน้าเว็บ ใช้ตรวจสอบข้อมูลก่อนอนุมัติเท่านั้น */
+  organizerContact?: string;
+  /** ISO timestamp ที่งานถูกส่งเข้ามา — ใช้เรียงคิวตรวจ */
+  createdAt: string;
+}
+
 /** สรุปงานของหนึ่งจังหวัด สำหรับระบายสีและแสดงป้ายบนแผนที่ */
 export interface ProvinceEventSummary {
   /** ISO 3166-2 เช่น 'TH-50' — ใช้เป็น key เชื่อมกับ PROVINCE_PATHS */

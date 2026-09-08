@@ -13,7 +13,9 @@ import { haversineMeters } from "@/lib/geo";
 import { ACTIVE_PROVINCE_IDS, isProvinceInScope } from "@/lib/region-scope";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
+  AdminEvent,
   EventFilters,
+  EventStatus,
   EventWithRelations,
   MapPinEvent,
   ProvinceEventSummary,
@@ -478,4 +480,114 @@ export async function getProvinceEventSummary(
       },
     ];
   });
+}
+
+// ---------------------------------------------------------------------------
+// ฝั่งแอดมิน — เห็นงานทุกสถานะ ไม่จำกัดขอบเขตภาค
+//
+// แยกกลุ่มไว้ชัดเจนเพราะกติกาต่างจากฝั่งสาธารณะทุกข้อ: ไม่กรอง status, ไม่กรองภาค
+// และตั้งใจไม่ห่อ React.cache เพราะหน้าแอดมินต้องเห็นผลทันทีหลังบันทึก
+//
+// ทุกตัวใช้ createSupabaseServerClient() ซึ่งวิ่งผ่าน RLS ด้วย session ของผู้ใช้จริง
+// policy `admins manage all events` เป็นคนตัดสินว่าเห็นได้ไหม — ถ้าโค้ดเผลอเรียกจากที่
+// ที่ไม่ใช่แอดมิน ฐานข้อมูลจะคืนค่าว่างแทนที่จะรั่วข้อมูลออกไป
+// ---------------------------------------------------------------------------
+
+/** คอลัมน์ที่หน้าแอดมินต้องใช้เพิ่มจากหน้าสาธารณะ */
+const ADMIN_EVENT_COLUMNS = `${EVENT_COLUMNS}, organizer_contact, status, created_at`;
+
+interface AdminEventRow extends EventRow {
+  organizer_contact: string | null;
+  status: EventStatus;
+  created_at: string;
+}
+
+/**
+ * แปลงแถวสำหรับหน้าแอดมิน — ต่างจาก toEvent() ตรงที่เก็บสถานะจริงไว้
+ *
+ * toEvent() ตั้ง status เป็น 'approved' ตายตัวได้ เพราะทุกทางที่เรียกมันกรองสถานะแล้ว
+ * แต่หน้าแอดมินคือที่เดียวที่ต้องแยกให้ออกว่างานไหนรออนุมัติ งานไหนถูกปฏิเสธไปแล้ว
+ */
+function toAdminEvent(row: AdminEventRow): AdminEvent | null {
+  const event = toEvent(row);
+  if (!event) return null;
+
+  return {
+    ...event,
+    status: row.status,
+    organizerContact: orUndefined(row.organizer_contact),
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * งานทั้งหมดสำหรับหน้าจัดการ เรียงงานที่เพิ่งเข้ามาก่อน
+ *
+ * @param status กรองเฉพาะสถานะที่ระบุ — ไม่ระบุคือเอาทุกสถานะ
+ */
+export async function listAdminEvents(status?: EventStatus): Promise<AdminEvent[]> {
+  const supabase = await createSupabaseServerClient();
+
+  let query = supabase.from("events").select(ADMIN_EVENT_COLUMNS);
+  if (status) query = query.eq("status", status);
+
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    .returns<AdminEventRow[]>();
+
+  if (error) {
+    console.error("[events] listAdminEvents ล้มเหลว:", error.message);
+    return [];
+  }
+
+  return (data ?? []).flatMap((row) => toAdminEvent(row) ?? []);
+}
+
+/** งานเดียวสำหรับหน้าแก้ไข — คืน null เมื่อไม่พบหรือผู้เรียกไม่ใช่แอดมิน */
+export async function getAdminEvent(id: string): Promise<AdminEvent | null> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("events")
+    .select(ADMIN_EVENT_COLUMNS)
+    .eq("id", id)
+    .returns<AdminEventRow[]>()
+    .maybeSingle();
+
+  if (error) {
+    console.error("[events] getAdminEvent ล้มเหลว:", error.message);
+    return null;
+  }
+
+  return data ? toAdminEvent(data) : null;
+}
+
+/**
+ * จำนวนงานแยกตามสถานะ — ใช้แสดงตัวเลขบนแท็บกรองของหน้าแอดมิน
+ *
+ * ใช้ `head: true` กับ `count: 'exact'` เพื่อให้ฐานข้อมูลนับให้แล้วส่งกลับแค่ตัวเลข
+ * ไม่ต้องดึงทุกแถวข้ามเน็ตมานับเองฝั่งแอป — ต่างจากการนับของหน้าแรกที่ต้องใช้ตัวข้อมูลจริง
+ * ในการแสดงผลอยู่แล้ว
+ */
+export async function countAdminEventsByStatus(): Promise<Record<EventStatus, number>> {
+  const supabase = await createSupabaseServerClient();
+  const statuses: EventStatus[] = ["draft", "pending", "approved", "rejected", "archived"];
+
+  const counted = await Promise.all(
+    statuses.map(async (status) => {
+      const { count, error } = await supabase
+        .from("events")
+        .select("id", { count: "exact", head: true })
+        .eq("status", status);
+
+      if (error) {
+        console.error(`[events] นับงานสถานะ ${status} ล้มเหลว:`, error.message);
+        return [status, 0] as const;
+      }
+
+      return [status, count ?? 0] as const;
+    }),
+  );
+
+  return Object.fromEntries(counted) as Record<EventStatus, number>;
 }

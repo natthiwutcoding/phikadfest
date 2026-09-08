@@ -25,7 +25,9 @@
 - [x] Supabase Auth (email + password) + หน้า `/login`
 - [x] หน้าแอดมิน `/admin` — อนุมัติ/ปฏิเสธงานที่ส่งเข้ามา ป้องกันสองชั้น (โค้ด + RLS)
 - [x] สร้างโปรเจกต์ Supabase + รัน migration ครบถึง `0004_event_cover_images.sql`
-- [ ] หน้าแอดมินสำหรับ **เพิ่ม/แก้ไข** งานเอง (ตอนนี้ทำได้แค่อนุมัติ/ปฏิเสธ)
+- [x] หน้าแอดมินสำหรับ **เพิ่ม/แก้ไข** งานเอง — `/admin/events/new` และ `/admin/events/[id]`
+      กรอกได้ครบทุกคอลัมน์ที่ schema รองรับ (เวลาจริง ราคา ลิงก์บัตร ผู้จัด อำเภอ ที่อยู่)
+      ส่วน `/admin` เปลี่ยนเป็นรายการงานทุกสถานะพร้อมแท็บกรอง
 - [x] อัปโหลดรูปปกงานเข้า Supabase Storage — bucket `event-covers` เขียนได้ทาง
       service role เท่านั้น แสดงผลผ่าน `next/image` ใน `EventCover`
 - [ ] OG image แบบ dynamic ต่องาน (`opengraph-image.tsx`)

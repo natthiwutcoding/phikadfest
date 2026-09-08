@@ -1,3 +1,4 @@
+import type { AdminEventErrors } from "@/lib/admin-event-validation";
 import type { SubmitErrors } from "@/lib/submit-validation";
 
 /**
@@ -27,3 +28,14 @@ export interface LoginState {
 }
 
 export const INITIAL_LOGIN_STATE: LoginState = { status: "idle" };
+
+/** สถานะของฟอร์มจัดการงานในหน้าแอดมิน */
+export interface AdminEventState {
+  status: "idle" | "success" | "error";
+  message?: string;
+  errors?: AdminEventErrors;
+  /** slug ของงานที่เพิ่งบันทึก — ใช้ทำลิงก์ไปดูหน้าจริงหลังบันทึกสำเร็จ */
+  savedSlug?: string;
+}
+
+export const INITIAL_ADMIN_EVENT_STATE: AdminEventState = { status: "idle" };
