@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   bangkokDay,
+  bangkokTime,
   formatAddress,
   formatDateRange,
   formatDayRange,
@@ -28,6 +29,17 @@ describe("bangkokDay", () => {
   it("ก่อนเที่ยงคืนเวลาไทยยังเป็นวันเดิม", () => {
     // 21 ส.ค. 16:59 UTC = 21 ส.ค. 23:59 ที่ไทย
     expect(bangkokDay("2026-08-21T16:59:00Z")).toBe("2026-08-21");
+  });
+});
+
+describe("bangkokTime", () => {
+  it("แปลงเวลาเป็นเขตเวลาไทย ไม่ใช่เวลาของเครื่องที่รัน", () => {
+    // 11:00 UTC = 18:00 ที่ไทย
+    expect(bangkokTime("2026-11-14T11:00:00Z")).toBe("18:00");
+  });
+
+  it("คืนรูปแบบ HH:MM ที่ <input type='time'> รับได้ตรงๆ", () => {
+    expect(bangkokTime("2026-11-14T02:05:00+07:00")).toBe("02:05");
   });
 });
 

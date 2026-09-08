@@ -1,8 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { requireAdmin } from "@/lib/auth";
+import { revalidateEventPages } from "@/lib/revalidate-events";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -38,8 +37,5 @@ export async function reviewEvent(formData: FormData) {
   }
 
   // ล้าง cache ของหน้าที่แสดงรายการงาน เพื่อให้เห็นผลทันที
-  revalidatePath("/admin");
-  revalidatePath("/events");
-  revalidatePath("/map");
-  revalidatePath("/");
+  revalidateEventPages();
 }

@@ -58,6 +58,17 @@ export function bangkokDay(date: Date | string): string {
   return isoDayFmt.format(typeof date === "string" ? new Date(date) : date);
 }
 
+/**
+ * คืนเวลาในเขตเวลาไทยเป็น 'HH:MM'
+ *
+ * ใช้เติมค่าเดิมลงช่อง <input type="time"> ในฟอร์มแอดมิน — ต้องเป็นเวลาไทยเสมอ
+ * เพราะ timestamp ในฐานข้อมูลเก็บเป็น UTC ถ้าแปลงตามเครื่องที่รัน เวลาที่แอดมินเห็น
+ * ตอนเปิดฟอร์มแก้ไขจะไม่ตรงกับที่ตัวเองกรอกไว้
+ */
+export function bangkokTime(date: Date | string): string {
+  return timeFmt.format(typeof date === "string" ? new Date(date) : date);
+}
+
 function daysBetween(fromDay: string, toDay: string): number {
   const from = Date.parse(`${fromDay}T00:00:00Z`);
   const to = Date.parse(`${toDay}T00:00:00Z`);
