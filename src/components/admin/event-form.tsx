@@ -316,9 +316,12 @@ export function AdminEventForm({ mode, defaultValues }: Props) {
           <span className="font-medium">ที่อยู่</span>
           <input
             {...bind("address")}
-            placeholder="ระดับตำบล/อำเภอ ไม่ต้องใส่ชื่อจังหวัดซ้ำ"
+            placeholder="ระดับตำบลหรือถนน เช่น ต.แสนสุข"
             className={fieldClass}
           />
+          <span className="mt-1 block text-xs text-muted">
+            อำเภอกรอกในช่องด้านบนแล้ว ตรงนี้ใส่เฉพาะส่วนที่เล็กกว่านั้น
+          </span>
           <FieldError message={errors.address} />
         </label>
 

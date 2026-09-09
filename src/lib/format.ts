@@ -156,20 +156,57 @@ export function formatPrice(isFree: boolean, priceMin?: number, priceMax?: numbe
   return `${baht(single)} บาท`;
 }
 
-/**
- * ประกอบที่อยู่เต็มพร้อมชื่อจังหวัด
- *
- * คอลัมน์ address ควรเก็บแค่ระดับตำบล/อำเภอ เพราะจังหวัดเป็น foreign key แยกอยู่แล้ว
- * แต่ข้อมูลที่ผู้ใช้กรอกเข้ามาเองมักพิมพ์จังหวัดต่อท้ายมาด้วย จึงต้องกันไม่ให้
- * แสดงซ้ำเป็น 'จ.สุโขทัย จ.สุโขทัย'
- *
- * กรุงเทพฯ ไม่ใช้คำนำหน้า 'จ.' เพราะมีสถานะเป็นเขตปกครองพิเศษ ไม่ใช่จังหวัด
- */
-export function formatAddress(address: string | undefined, provinceNameTh: string): string {
-  const label = provinceNameTh === "กรุงเทพมหานคร" ? provinceNameTh : `จ.${provinceNameTh}`;
+const BANGKOK = "กรุงเทพมหานคร";
 
-  if (!address) return label;
-  return address.includes(provinceNameTh) ? address : `${address} ${label}`;
+/**
+ * ผู้กรอกพิมพ์ชื่อจังหวัดมาในช่องที่อยู่แล้วหรือยัง
+ *
+ * ⚠️ ต้องเทียบแบบ "เป็นคำ" ห้ามใช้ includes() เฉยๆ
+ * อำเภอเมืองของทุกจังหวัดมีชื่อจังหวัดอยู่ข้างใน — 'อ.เมืองชลบุรี' มีคำว่า 'ชลบุรี'
+ * ถ้าเช็คหลวมๆ ระบบจะเข้าใจผิดว่าระบุจังหวัดมาแล้ว ที่อยู่จะจบลงโดยไม่มีชื่อจังหวัดเลย
+ */
+function mentionsProvince(address: string, provinceNameTh: string): boolean {
+  return (
+    address.includes(`จ.${provinceNameTh}`) ||
+    address === provinceNameTh ||
+    address.endsWith(` ${provinceNameTh}`)
+  );
+}
+
+/**
+ * ประกอบที่อยู่เต็ม เรียงจากหน่วยเล็กไปใหญ่ — ตำบล/ถนน → อำเภอ → จังหวัด
+ *
+ * ทั้งสามส่วนเก็บแยกคอลัมน์กันในฐานข้อมูล (address / district / จังหวัดเป็น foreign key)
+ * ฟังก์ชันนี้จึงเป็นที่เดียวที่รู้ว่าเรียงลำดับยังไงและใส่คำนำหน้าอะไร
+ *
+ * ── สองอย่างที่ต้องกันไม่ให้ซ้ำ ──
+ * ผู้กรอกมักพิมพ์อำเภอหรือจังหวัดต่อท้ายช่องที่อยู่มาด้วย ทั้งที่มีช่องแยกให้แล้ว
+ * ถ้าเติมทับไปตรงๆ จะได้ 'ต.ปากน้ำ อ.เมืองระยอง อ.เมืองระยอง จ.ระยอง'
+ *
+ * กรุงเทพฯ ใช้ 'เขต' แทน 'อ.' และไม่มีคำนำหน้า 'จ.' เพราะเป็นเขตปกครองพิเศษ ไม่ใช่จังหวัด
+ * (ยังไม่อยู่ในขอบเขตที่เปิดรับงาน แต่ข้อมูลจังหวัดมีครบ 77 อยู่แล้ว จึงรองรับไว้)
+ */
+export function formatAddress(place: {
+  address?: string;
+  district?: string;
+  provinceNameTh: string;
+}): string {
+  const { address, district, provinceNameTh } = place;
+  const isBangkok = provinceNameTh === BANGKOK;
+
+  const parts: string[] = [];
+
+  if (address) parts.push(address);
+
+  if (district && !address?.includes(district)) {
+    parts.push(isBangkok ? `เขต${district}` : `อ.${district}`);
+  }
+
+  if (!address || !mentionsProvince(address, provinceNameTh)) {
+    parts.push(isBangkok ? provinceNameTh : `จ.${provinceNameTh}`);
+  }
+
+  return parts.join(" ");
 }
 
 /** ระยะทาง เช่น '850 ม.' / '8.4 กม.' / '133 กม.' — เกิน 10 กม. ปัดเป็นจำนวนเต็ม */

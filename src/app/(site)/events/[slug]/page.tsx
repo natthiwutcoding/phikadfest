@@ -120,7 +120,11 @@ export default async function EventDetailPage(props: PageProps<"/events/[slug]">
           <dd className="mt-0.5">
             {event.venueName ?? "—"}
             <span className="block text-sm text-muted">
-              {formatAddress(event.address, event.province.nameTh)}
+              {formatAddress({
+                address: event.address,
+                district: event.district,
+                provinceNameTh: event.province.nameTh,
+              })}
             </span>
           </dd>
         </div>
